@@ -1,0 +1,25 @@
+# Neo4j 5 with the Graph Data Science + APOC plugins.
+#   docker compose up -d neo4j          -> Browser at http://localhost:7474 (user neo4j)
+#   python -m scamkg build-graph --backend neo4j
+# Database dump (deliverable):
+#   docker compose stop neo4j
+#   docker compose run --rm neo4j neo4j-admin database dump neo4j --to-path=/dumps
+#   docker compose start neo4j
+services:
+  neo4j:
+    image: neo4j:5.20
+    container_name: scamkg-neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD:-scamkg-password}"
+      NEO4J_PLUGINS: '["graph-data-science", "apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: "gds.*,apoc.*"
+      NEO4J_server_memory_heap_max__size: "2G"
+      NEO4J_server_memory_pagecache_size: "1G"
+    volumes:
+      - ./neo4j/data:/data
+      - ./neo4j/logs:/logs
+      - ./neo4j/dumps:/dumps
+      - ./neo4j/import:/import

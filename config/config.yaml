@@ -1,0 +1,136 @@
+# Main configuration. Relative paths are resolved against the repository root.
+# Override any key with a second YAML file:
+#   python -m scamkg --config config/demo.yaml <command>
+project:
+  seed: 42
+
+paths:
+  data_raw: data/raw
+  data_processed: data/processed
+  kg: data/kg
+  cache: data/cache
+  annotations: data/annotations
+  results: results
+  artifacts: artifacts
+
+data:
+  load: [bothbosu, kaggle, ncsu]   # loaders run by `preprocess` (scamkg/data/loaders.py)
+  primary: bothbosu                # train / val / test splits come from this data set
+  external: [kaggle, ncsu]         # cross-dataset generalization sets (X2)
+  mixed_external:                  # [positives from, negatives from] -> realistic two-class set
+    - [ncsu, kaggle]
+  val_size: 0.15
+  test_size: 0.15
+  min_words: 5
+  imbalanced_test:                 # re-sampled test split with a realistic scam rate
+    scam_rate: 0.05
+    n_draws: 20
+  sources:
+    bothbosu:
+      hf_name: BothBosu/scam-dialogue
+      local_dir: data/raw/bothbosu
+    kaggle:
+      slug: null                   # "<owner>/<dataset>" to download with the Kaggle CLI
+      local_dir: data/raw/kaggle
+      text_col: null               # null = auto-detect
+      label_col: null
+      id_col: null
+      speaker_col: null
+    ncsu:
+      urls:
+        - https://raw.githubusercontent.com/wspr-ncsu/robocall-audio-dataset/main/metadata.csv
+        - https://raw.githubusercontent.com/wspr-ncsu/robocall-audio-dataset/master/metadata.csv
+      local_dir: data/raw/ncsu
+      label: 1                     # every recording comes from an FTC enforcement action
+      language: en
+
+ontology:
+  path: ontology/ontology.yaml
+  owl: ontology/fraud_call_ontology.ttl
+  shapes: ontology/shapes.ttl
+
+llm:
+  provider: ollama                 # ollama | voyager (any OpenAI-compatible endpoint)
+  model: qwen2.5:7b
+  compare_models: [qwen2.5:7b, gemma2:9b]
+  prompt_version: v1_full          # v1_full | v2_no_descriptors | v3_no_example | v0_open
+  temperature: 0.1
+  seed: 42
+  max_retries: 2
+  grounding: true                  # drop triples whose evidence/mention is not in the transcript
+  max_chars: 6000
+  max_tokens: 2048                 # output cap (Ollama num_predict / OpenAI max_tokens)
+  timeout: 180
+  max_workers: 1
+  json_mode: true
+  providers:
+    ollama:
+      base_url: http://localhost:11434
+      base_url_env: OLLAMA_BASE_URL
+      num_ctx: 8192
+    voyager:
+      base_url: null
+      base_url_env: VOYAGER_BASE_URL
+      api_key_env: VOYAGER_API_KEY
+
+extraction:
+  default_run: null                # extraction run used for the KG; null = most recent run
+
+graph:
+  backend: networkx                # networkx | neo4j (Neo4j Graph Data Science)
+  similarity_top_k: 10             # call-call similarity graph: top-k neighbours per call
+  similarity_min: 0.2              # ... with Jaccard >= this
+  louvain_resolution: 1.0
+  betweenness_samples: 300
+  knn_k: 10
+  sim_topk: 5
+  smoothing: 2.0                   # Bayesian smoothing for leak-safe label rates
+  onehot_min_count: 2              # entity one-hot columns need >= this many calls
+
+neo4j:
+  uri: bolt://localhost:7687
+  user: neo4j
+  uri_env: NEO4J_URI
+  user_env: NEO4J_USER
+  password_env: NEO4J_PASSWORD
+  database: neo4j
+  batch_size: 500
+
+models:
+  classical: [lr, svm, rf, xgb]
+  search_iter: 12                  # randomized search iterations on the validation split
+  threshold: 0.5
+  cv_folds: 5
+  graph_feature_weight: 1.0
+  tfidf:
+    ngram_range: [1, 2]
+    min_df: 2
+    max_df: 0.95
+    max_features: 50000
+    sublinear_tf: true
+  transformer:
+    model_name: distilbert-base-uncased
+    max_length: 256
+    epochs: 3
+    batch_size: 16
+    lr: 2.0e-5
+    weight_decay: 0.01
+    seeds: [42]
+  sbert:
+    model_name: sentence-transformers/all-MiniLM-L6-v2
+    chunk_words: 180
+    mlp_hidden: [256]
+  graphsage:
+    hidden: 64
+    dropout: 0.3
+    lr: 0.01
+    weight_decay: 5.0e-4
+    epochs: 300
+    patience: 30
+    node_features: sbert           # sbert | tfidf_svd
+    use_similarity_edges: false
+  clustering:
+    k_min: 2
+    k_max: 12
+    pca_dim: 20
+    dbscan_min_samples: 5

@@ -1,0 +1,300 @@
+# Minimal fraud-call ontology (proposal Table II).
+#
+# Single source of truth for the pipeline:
+#   * LLM extraction prompts (type descriptors + allowed values)
+#   * JSON / schema validation of extracted triples
+#   * entity standardization (synonyms, organization aliases)
+#   * Neo4j node labels / relationship types
+#   * RDF export (the OWL T-box lives in fraud_call_ontology.ttl and must stay in sync;
+#     tests/test_ontology.py checks this)
+#
+# Closed types have a controlled vocabulary ("values"); the LLM must pick one of them.
+# Open types (Organization, CallbackNumber) keep the name / number from the call and are
+# canonicalized with "aliases" or number normalization.
+name: FraudCallOntology
+version: "0.1.0"
+namespace: "http://www.semanticweb.org/cse573/scamkg#"
+
+entity_types:
+  Call:
+    descriptor: "One transcript; holds label and metadata"
+    extractable: false
+
+  ClaimedIdentity:
+    descriptor: "Who the caller says they are (bank, IRS, police, tech support, relative)"
+    closed: true
+    values:
+      bank:
+        descriptor: "a bank, credit union, card issuer or its fraud department"
+        synonyms: [bank, bank representative, bank employee, bank officer, credit union, fraud department,
+                   fraud prevention department, fraud team, card services, cardmember services, card issuer,
+                   credit card company, bank security team, account security team, financial institution, banker]
+      government_agent:
+        descriptor: "a government agency or official (SSA, IRS, Medicare, customs, immigration)"
+        synonyms: [government, government agent, government official, government agency, federal agent,
+                   federal agency, federal government, government employee, social security,
+                   social security administration, social security officer, social security agent,
+                   ssa agent, ssa officer, irs agent, irs officer, tax agent, tax officer, internal revenue service,
+                   irs, ssa, medicare, medicare representative, customs officer, immigration officer, treasury,
+                   treasury department, dmv, census bureau]
+      law_enforcement:
+        descriptor: "police, sheriff, FBI, DEA, marshals, courts"
+        synonyms: [police, police officer, officer, sheriff, deputy, detective, fbi agent, fbi, dea agent, dea,
+                   us marshal, marshal, law enforcement, cop, police department, court, court officer, judge,
+                   investigator, special agent]
+      tech_support:
+        descriptor: "technical / computer support (Microsoft, Apple, antivirus, IT help desk)"
+        synonyms: [tech support, technical support, it support, computer support, microsoft support,
+                   apple support, windows support, windows technician, help desk, technician, computer technician,
+                   security technician, antivirus support, geek squad, support agent, microsoft technician]
+      relative_or_friend:
+        descriptor: "a family member, friend or acquaintance of the receiver"
+        synonyms: [relative, family member, grandson, granddaughter, grandchild, son, daughter, nephew, niece,
+                   cousin, brother, sister, mom, mother, dad, father, uncle, aunt, friend, old friend, family,
+                   grandma, grandpa, grandmother, grandfather, spouse, husband, wife, neighbor]
+      utility_company:
+        descriptor: "an electricity, gas, water or other utility provider"
+        synonyms: [utility company, utility, electric company, power company, gas company, water company,
+                   energy company, electricity provider, utility provider, power and light]
+      delivery_service:
+        descriptor: "a courier, postal or delivery company"
+        synonyms: [delivery service, courier, delivery driver, postal service, post office, shipping company,
+                   delivery company, logistics company, package delivery, mail carrier, usps, fedex, ups, dhl]
+      employer_recruiter:
+        descriptor: "an employer, recruiter, HR department or staffing agency"
+        synonyms: [employer, recruiter, hiring manager, hr, human resources, job agency, staffing agency,
+                   employment agency, headhunter, talent acquisition, manager, boss]
+      prize_or_lottery:
+        descriptor: "a lottery, sweepstakes, contest or prize organizer"
+        synonyms: [lottery, sweepstakes, prize department, contest, lottery official, prize, prize patrol,
+                   giveaway, raffle, lottery commission, publishers clearing house]
+      insurance:
+        descriptor: "an insurance or warranty provider"
+        synonyms: [insurance, insurance agent, insurance company, insurance provider, warranty company,
+                   auto warranty, vehicle warranty, extended warranty, car warranty, health insurance]
+      healthcare_provider:
+        descriptor: "a doctor's office, clinic, hospital, pharmacy or dentist"
+        synonyms: [doctor, "doctor's office", clinic, hospital, pharmacy, pharmacist, nurse, dentist,
+                   dental office, medical office, healthcare provider, physician, medical center, health clinic,
+                   receptionist]
+      retailer_customer_service:
+        descriptor: "a store, online retailer, subscription or service provider's customer service"
+        synonyms: [customer service, customer support, customer care, retailer, store, online store, shop,
+                   merchant, order department, billing department, subscription service, service provider,
+                   account services, company representative, amazon customer service, amazon security]
+      charity:
+        descriptor: "a charity, non-profit, church or fundraiser"
+        synonyms: [charity, nonprofit, non profit, foundation, fundraiser, donation drive, relief fund,
+                   charitable organization, church]
+      telemarketer_sales:
+        descriptor: "a salesperson, telemarketer, marketer or survey company"
+        synonyms: [salesperson, sales representative, sales rep, telemarketer, marketing, sales, sales team,
+                   promotions department, vacation club, timeshare, travel agency, solar company, real estate agent,
+                   investment advisor, broker, financial advisor, survey, market research]
+      other:
+        descriptor: "any other identity"
+        synonyms: []
+
+  Organization:
+    descriptor: "Named company or agency mentioned (Amazon, SSA, Microsoft)"
+    closed: false
+    aliases:
+      "Social Security Administration": [ssa, social security administration, social security office,
+                                         social security, social security department]
+      "Internal Revenue Service": [irs, internal revenue service, internal revenue]
+      "Medicare": [medicare, centers for medicare]
+      "Federal Bureau of Investigation": [fbi, federal bureau of investigation]
+      "Drug Enforcement Administration": [dea, drug enforcement administration]
+      "US Marshals Service": [us marshals, u s marshals, marshals service, united states marshals]
+      "Department of Homeland Security": [dhs, homeland security, department of homeland security]
+      "Immigration and Customs Enforcement": [ice, immigration and customs enforcement, uscis, immigration office]
+      "US Customs and Border Protection": [customs, customs and border protection, cbp, border protection]
+      "Federal Trade Commission": [ftc, federal trade commission]
+      "US Treasury": [us treasury, department of treasury, department of the treasury, treasury department]
+      "US Postal Service": [usps, us postal service, united states postal service, postal service]
+      "FedEx": [fedex, federal express]
+      "UPS": [ups, united parcel service]
+      "DHL": [dhl]
+      "Amazon": [amazon, amazon com, amazon prime, amazon customer service, amazon security]
+      "Microsoft": [microsoft, microsoft support, microsoft windows, windows support]
+      "Apple": [apple, icloud, apple support, applecare, apple care]
+      "Google": [google]
+      "PayPal": [paypal]
+      "Walmart": [walmart]
+      "Target": [target]
+      "Best Buy": [best buy, geek squad]
+      "eBay": [ebay]
+      "Netflix": [netflix]
+      "Bank of America": [bank of america, bofa]
+      "Chase": [chase, chase bank, jpmorgan chase, jp morgan chase]
+      "Wells Fargo": [wells fargo]
+      "Citibank": [citibank, citi bank, citi]
+      "Capital One": [capital one]
+      "Visa": [visa]
+      "Mastercard": [mastercard, master card]
+      "American Express": [american express, amex]
+      "Western Union": [western union]
+      "MoneyGram": [moneygram, money gram]
+      "Coinbase": [coinbase]
+      "Norton": [norton, norton antivirus, nortonlifelock]
+      "McAfee": [mcafee]
+      "Comcast": [comcast, xfinity]
+      "Verizon": [verizon]
+      "AT&T": ["at&t", att, at and t]
+      "T-Mobile": [t mobile, tmobile]
+      "Publishers Clearing House": [publishers clearing house, pch]
+      "CVS": [cvs, cvs pharmacy]
+      "Walgreens": [walgreens]
+      "State Farm": [state farm]
+      "Geico": [geico]
+
+  PressureTactic:
+    descriptor: "Persuasion used: urgency, threat, reward, fear, secrecy"
+    closed: true
+    values:
+      urgency:
+        descriptor: "time pressure: act now, today, immediately, a deadline"
+        synonyms: [urgency, urgent, immediately, right now, right away, today, time sensitive, time pressure,
+                   deadline, limited time, limited time offer, act now, hurry, as soon as possible, asap,
+                   within 24 hours, expires, last chance, quickly, before the end of the day]
+      threat:
+        descriptor: "threat of arrest, legal action, suspension, fines, disconnection or account freezing"
+        synonyms: [threat, threaten, arrest, arrested, warrant, arrest warrant, lawsuit, legal action, jail,
+                   prison, suspend, suspended, suspension, fine, penalty, deport, deportation, freeze, frozen,
+                   blocked, cut off, disconnect, disconnected, disconnection, shut off, charges, prosecution,
+                   seize, seizure, legal consequences, account closure]
+      reward:
+        descriptor: "promise of a prize, refund, free gift, discount or guaranteed return"
+        synonyms: [reward, prize, won, winner, win, free, free gift, gift, bonus, refund, cash back, discount,
+                   jackpot, sweepstakes, lottery, compensation, reimbursement, guaranteed return,
+                   investment opportunity, special offer, promotion, lower interest rate]
+      fear:
+        descriptor: "creating fear: hacked device, stolen identity, suspicious activity, emergency, accident"
+        synonyms: [fear, scare, danger, dangerous, compromised, hacked, virus, malware, stolen, identity theft,
+                   suspicious activity, suspicious transaction, fraudulent activity, illegal activity,
+                   fraud alert, emergency, accident, in trouble, security breach, unauthorized]
+      secrecy:
+        descriptor: "demands to keep the call secret or stay on the line"
+        synonyms: [secrecy, secret, confidential, "don't tell", do not tell, keep this between us,
+                   "don't hang up", do not hang up, stay on the line, do not discuss, keep it private,
+                   "don't tell anyone", gag order, "don't contact your bank", isolation]
+      other:
+        descriptor: "any other persuasion technique"
+        synonyms: []
+
+  RequestedAsset:
+    descriptor: "What the caller wants: OTP, SSN, card, password, remote access, money"
+    closed: true
+    values:
+      otp:
+        descriptor: "one-time password or verification code"
+        synonyms: [otp, one time password, one time code, verification code, security code, confirmation code,
+                   authentication code, 2fa code, two factor code, code, six digit code, passcode sent]
+      ssn:
+        descriptor: "social security number or national ID number"
+        synonyms: [ssn, social security number, social security, social insurance number, national id number,
+                   tax id, taxpayer id]
+      card_number:
+        descriptor: "credit / debit card number, CVV or expiry"
+        synonyms: [card number, credit card number, debit card number, card details, credit card, debit card,
+                   card information, cvv, expiration date, card, card info, card details and cvv]
+      bank_account:
+        descriptor: "bank account / routing number or online banking access"
+        synonyms: [bank account, account number, routing number, bank details, banking information,
+                   account details, online banking login, bank login, bank account number]
+      password:
+        descriptor: "password, PIN or login credentials"
+        synonyms: [password, pin, pin number, login credentials, username and password, account password,
+                   credentials, login]
+      remote_access:
+        descriptor: "remote control of the receiver's computer or phone"
+        synonyms: [remote access, remote desktop, teamviewer, anydesk, screen sharing, access to your computer,
+                   install software, download an app, remote control, computer access]
+      money:
+        descriptor: "a payment, fee, fine, transfer or donation"
+        synonyms: [money, payment, cash, fee, fine, funds, transfer, deposit, processing fee, tax payment, bail,
+                   donation, amount, savings, penalty]
+      personal_info:
+        descriptor: "other personal data: date of birth, address, full name, ID or policy numbers"
+        synonyms: [personal information, personal details, date of birth, dob, birth date, address,
+                   home address, full name, "mother's maiden name", "driver's license", id, identity verification,
+                   email address, email, medicare number, insurance id, member id, zip code, policy number]
+      other:
+        descriptor: "anything else"
+        synonyms: []
+
+  PaymentChannel:
+    descriptor: "How money moves: gift card, wire, crypto, Zelle, cash"
+    closed: true
+    values:
+      gift_card:
+        descriptor: "gift or prepaid cards (Google Play, iTunes, Steam, Target...)"
+        synonyms: [gift card, google play card, google play, itunes card, itunes, apple gift card, steam card,
+                   amazon gift card, prepaid card, target gift card, ebay gift card, visa gift card,
+                   walmart gift card, gift voucher]
+      wire_transfer:
+        descriptor: "wire transfer or money transfer service (Western Union, MoneyGram)"
+        synonyms: [wire transfer, wire, western union, moneygram, money gram, money transfer, international transfer]
+      crypto:
+        descriptor: "cryptocurrency (Bitcoin, Bitcoin ATM, USDT...)"
+        synonyms: [crypto, cryptocurrency, bitcoin, btc, ethereum, usdt, bitcoin atm, crypto wallet, coinbase,
+                   digital currency]
+      zelle:
+        descriptor: "Zelle"
+        synonyms: [zelle]
+      p2p_app:
+        descriptor: "peer-to-peer payment app (Venmo, Cash App, PayPal)"
+        synonyms: [venmo, cash app, cashapp, paypal, apple pay, google pay, payment app]
+      bank_transfer:
+        descriptor: "bank / ACH transfer, often to a so-called safe account"
+        synonyms: [bank transfer, direct deposit, ach, account transfer, safe account, secure account,
+                   transfer to account]
+      cash:
+        descriptor: "cash handed to a courier, mailed or deposited"
+        synonyms: [cash, cash pickup, courier pickup, mail cash, cash in envelope, in person]
+      check_or_money_order:
+        descriptor: "check, cashier's check or money order"
+        synonyms: [check, cheque, money order, "cashier's check", certified check]
+      credit_card_payment:
+        descriptor: "payment by credit / debit card over the phone or online"
+        synonyms: [credit card payment, pay by card, card payment, debit card payment, pay over the phone,
+                   pay online]
+      other:
+        descriptor: "any other payment method"
+        synonyms: []
+
+  CallbackNumber:
+    descriptor: "Phone number or extension the caller gives"
+    closed: false
+
+relations:
+  CLAIMS_TO_BE:
+    source: Call
+    target: ClaimedIdentity
+    rdf_property: claimsToBe
+    descriptor: "the caller presents themself as this identity"
+  MENTIONS_ORG:
+    source: Call
+    target: Organization
+    rdf_property: mentionsOrg
+    descriptor: "the caller names this company or agency"
+  USES_TACTIC:
+    source: Call
+    target: PressureTactic
+    rdf_property: usesTactic
+    descriptor: "the caller uses this persuasion / pressure technique"
+  REQUESTS:
+    source: Call
+    target: RequestedAsset
+    rdf_property: requests
+    descriptor: "the caller asks the receiver for this asset or information"
+  PAY_VIA:
+    source: Call
+    target: PaymentChannel
+    rdf_property: payVia
+    descriptor: "the caller wants money to move through this channel"
+  PROVIDES_NUMBER:
+    source: Call
+    target: CallbackNumber
+    rdf_property: providesNumber
+    descriptor: "the caller gives this call-back number, extension or IVR option"

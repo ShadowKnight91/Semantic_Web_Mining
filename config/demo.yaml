@@ -1,0 +1,29 @@
+# Offline demo on synthetic, template-generated calls (scamkg/data/synthetic.py).
+# Lets the whole pipeline run without downloads, an LLM server or Neo4j.
+# Results on this data are NOT evidence for the research questions.
+paths:
+  data_raw: data/demo/raw
+  data_processed: data/demo/processed
+  kg: data/demo/kg
+  cache: data/demo/cache
+  annotations: data/demo/annotations
+  results: results/demo
+  artifacts: artifacts/demo
+
+data:
+  load: [demo]
+  primary: demo_primary
+  external: [demo_shifted, demo_robocall]
+  mixed_external:
+    - [demo_robocall, demo_shifted]
+
+models:
+  search_iter: 4
+  transformer:
+    epochs: 1
+  graphsage:
+    epochs: 150
+    patience: 20
+
+graph:
+  betweenness_samples: 100

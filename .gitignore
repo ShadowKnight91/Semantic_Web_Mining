@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+.env
+
+# data, caches and generated outputs (re-creatable with the CLI)
+data/raw/
+data/processed/
+data/kg/
+data/cache/
+data/demo/
+results/
+artifacts/
+neo4j/data/
+neo4j/logs/
+neo4j/dumps/
+neo4j/import/
+
+# keep hand-made annotations
+!data/annotations/

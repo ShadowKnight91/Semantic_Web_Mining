@@ -1,0 +1,47 @@
+# Example SPARQL queries over the exported KG (data/kg/rdf/kg_<run>.ttl).
+# Run them with:  python -m scamkg sparql --query-file ontology/queries.sparql
+# Queries are separated by lines that start with "#---".
+
+#--- Q1: calls that pair a government identity with a gift-card payment (the SSA script)
+PREFIX :     <http://www.semanticweb.org/cse573/scamkg#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?callId ?isScam WHERE {
+  ?call a :Call ; :callId ?callId ;
+        :claimsToBe ?id ; :payVia ?pay .
+  ?id  :canonicalName "government_agent" .
+  ?pay :canonicalName "gift_card" .
+  OPTIONAL { ?call :isScam ?isScam }
+}
+ORDER BY ?callId
+LIMIT 50
+
+#--- Q2: most frequent identity -> asset combinations among scam calls
+PREFIX : <http://www.semanticweb.org/cse573/scamkg#>
+SELECT ?identity ?asset (COUNT(DISTINCT ?call) AS ?calls) WHERE {
+  ?call :isScam true ; :claimsToBe ?i ; :requests ?a .
+  ?i :canonicalName ?identity .
+  ?a :canonicalName ?asset .
+}
+GROUP BY ?identity ?asset
+ORDER BY DESC(?calls)
+LIMIT 20
+
+#--- Q3: pressure tactics ranked by scam rate
+PREFIX : <http://www.semanticweb.org/cse573/scamkg#>
+SELECT ?tactic (COUNT(?call) AS ?n) (AVG(IF(?scam, 1.0, 0.0)) AS ?scamRate) WHERE {
+  ?call :usesTactic ?t ; :isScam ?scam .
+  ?t :canonicalName ?tactic .
+}
+GROUP BY ?tactic
+ORDER BY DESC(?scamRate)
+
+#--- Q4: facts the LLM inferred (not stated verbatim) with their evidence
+PREFIX :    <http://www.semanticweb.org/cse573/scamkg#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+SELECT ?callId ?p ?name ?evidence WHERE {
+  ?st a rdf:Statement ; rdf:subject ?call ; rdf:predicate ?p ; rdf:object ?o ; :inferred true .
+  ?call :callId ?callId .
+  ?o :canonicalName ?name .
+  OPTIONAL { ?st :evidence ?evidence }
+}
+LIMIT 25

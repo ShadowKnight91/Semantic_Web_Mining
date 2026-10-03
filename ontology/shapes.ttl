@@ -1,0 +1,23 @@
+@prefix :    <http://www.semanticweb.org/cse573/scamkg#> .
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# SHACL shapes used to validate the exported knowledge graph (python -m scamkg build-graph).
+
+:CallShape a sh:NodeShape ;
+    sh:targetClass :Call ;
+    sh:property [ sh:path :callId ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path :dataset ; sh:minCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path :isScam ; sh:maxCount 1 ; sh:datatype xsd:boolean ] ;
+    sh:property [ sh:path :claimsToBe ; sh:class :ClaimedIdentity ] ;
+    sh:property [ sh:path :mentionsOrg ; sh:class :Organization ] ;
+    sh:property [ sh:path :usesTactic ; sh:class :PressureTactic ] ;
+    sh:property [ sh:path :requests ; sh:class :RequestedAsset ] ;
+    sh:property [ sh:path :payVia ; sh:class :PaymentChannel ] ;
+    sh:property [ sh:path :providesNumber ; sh:class :CallbackNumber ] .
+
+:EntityShape a sh:NodeShape ;
+    sh:targetClass :ClaimedIdentity , :Organization , :PressureTactic ,
+                   :RequestedAsset , :PaymentChannel , :CallbackNumber ;
+    sh:property [ sh:path :canonicalName ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] .

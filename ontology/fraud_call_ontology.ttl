@@ -1,0 +1,151 @@
+@prefix :     <http://www.semanticweb.org/cse573/scamkg#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix dct:  <http://purl.org/dc/terms/> .
+
+#################################################################
+#  Minimal Fraud-Call Ontology (T-box)
+#  CSE 573 Semantic Web Mining - Project P10
+#  Controlled-vocabulary individuals (A-box, e.g. :ClaimedIdentity/bank) are generated
+#  from ontology/ontology.yaml by scamkg.graph.rdf_export.
+#################################################################
+
+<http://www.semanticweb.org/cse573/scamkg> a owl:Ontology ;
+    rdfs:label "Minimal Fraud-Call Ontology"@en ;
+    dct:description "Smallest ontology sufficient to reason about phone-scam scripts: who the caller claims to be, which pressure tactics they use, what they request and how money should move."@en ;
+    owl:versionInfo "0.1.0" .
+
+#################################################################
+#  Classes
+#################################################################
+
+:Call a owl:Class ;
+    rdfs:label "Call"@en ;
+    rdfs:comment "One transcript; holds label and metadata."@en .
+
+:Entity a owl:Class ;
+    rdfs:label "Entity"@en ;
+    rdfs:comment "Abstract super-class of everything a call can be linked to."@en .
+
+:ClaimedIdentity a owl:Class ;
+    rdfs:subClassOf :Entity ;
+    rdfs:label "ClaimedIdentity"@en ;
+    rdfs:comment "Who the caller says they are (bank, IRS, police, tech support, relative)."@en .
+
+:Organization a owl:Class ;
+    rdfs:subClassOf :Entity ;
+    rdfs:label "Organization"@en ;
+    rdfs:comment "Named company or agency mentioned (Amazon, SSA, Microsoft)."@en .
+
+:PressureTactic a owl:Class ;
+    rdfs:subClassOf :Entity ;
+    rdfs:label "PressureTactic"@en ;
+    rdfs:comment "Persuasion used: urgency, threat, reward, fear, secrecy."@en .
+
+:RequestedAsset a owl:Class ;
+    rdfs:subClassOf :Entity ;
+    rdfs:label "RequestedAsset"@en ;
+    rdfs:comment "What the caller wants: OTP, SSN, card, password, remote access, money."@en .
+
+:PaymentChannel a owl:Class ;
+    rdfs:subClassOf :Entity ;
+    rdfs:label "PaymentChannel"@en ;
+    rdfs:comment "How money moves: gift card, wire, crypto, Zelle, cash."@en .
+
+:CallbackNumber a owl:Class ;
+    rdfs:subClassOf :Entity ;
+    rdfs:label "CallbackNumber"@en ;
+    rdfs:comment "Phone number or extension the caller gives."@en .
+
+[] a owl:AllDisjointClasses ;
+    owl:members ( :Call :ClaimedIdentity :Organization :PressureTactic
+                  :RequestedAsset :PaymentChannel :CallbackNumber ) .
+
+#################################################################
+#  Object properties (Call -> Entity)
+#################################################################
+
+:claimsToBe a owl:ObjectProperty ;
+    rdfs:label "CLAIMS_TO_BE"@en ;
+    rdfs:comment "The caller presents themself as this identity."@en ;
+    rdfs:domain :Call ;
+    rdfs:range :ClaimedIdentity .
+
+:mentionsOrg a owl:ObjectProperty ;
+    rdfs:label "MENTIONS_ORG"@en ;
+    rdfs:comment "The caller names this company or agency."@en ;
+    rdfs:domain :Call ;
+    rdfs:range :Organization .
+
+:usesTactic a owl:ObjectProperty ;
+    rdfs:label "USES_TACTIC"@en ;
+    rdfs:comment "The caller uses this persuasion / pressure technique."@en ;
+    rdfs:domain :Call ;
+    rdfs:range :PressureTactic .
+
+:requests a owl:ObjectProperty ;
+    rdfs:label "REQUESTS"@en ;
+    rdfs:comment "The caller asks the receiver for this asset or information."@en ;
+    rdfs:domain :Call ;
+    rdfs:range :RequestedAsset .
+
+:payVia a owl:ObjectProperty ;
+    rdfs:label "PAY_VIA"@en ;
+    rdfs:comment "The caller wants money to move through this channel."@en ;
+    rdfs:domain :Call ;
+    rdfs:range :PaymentChannel .
+
+:providesNumber a owl:ObjectProperty ;
+    rdfs:label "PROVIDES_NUMBER"@en ;
+    rdfs:comment "The caller gives this call-back number, extension or IVR option."@en ;
+    rdfs:domain :Call ;
+    rdfs:range :CallbackNumber .
+
+:similarTo a owl:ObjectProperty , owl:SymmetricProperty ;
+    rdfs:label "SIMILAR_TO"@en ;
+    rdfs:comment "Derived call-call edge: the calls share ontology entities (Jaccard similarity)."@en ;
+    rdfs:domain :Call ;
+    rdfs:range :Call .
+
+#################################################################
+#  Datatype properties
+#################################################################
+
+:callId a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:domain :Call ; rdfs:range xsd:string .
+
+:dataset a owl:DatatypeProperty ;
+    rdfs:domain :Call ; rdfs:range xsd:string .
+
+:split a owl:DatatypeProperty ;
+    rdfs:comment "train / val / test / external."@en ;
+    rdfs:domain :Call ; rdfs:range xsd:string .
+
+:isScam a owl:DatatypeProperty , owl:FunctionalProperty ;
+    rdfs:comment "Gold label of the call (true = scam)."@en ;
+    rdfs:domain :Call ; rdfs:range xsd:boolean .
+
+:scamScore a owl:DatatypeProperty ;
+    rdfs:comment "Model score for the call being a scam (0..1)."@en ;
+    rdfs:domain :Call ; rdfs:range xsd:decimal .
+
+:transcript a owl:DatatypeProperty ;
+    rdfs:domain :Call ; rdfs:range xsd:string .
+
+:canonicalName a owl:DatatypeProperty ;
+    rdfs:domain :Entity ; rdfs:range xsd:string .
+
+:inferred a owl:DatatypeProperty ;
+    rdfs:comment "On a reified statement: true when the LLM inferred the fact instead of reading it in the text."@en ;
+    rdfs:domain rdf:Statement ; rdfs:range xsd:boolean .
+
+:evidence a owl:DatatypeProperty ;
+    rdfs:comment "On a reified statement: supporting quote from the transcript."@en ;
+    rdfs:domain rdf:Statement ; rdfs:range xsd:string .
+
+:detail a owl:DatatypeProperty ;
+    rdfs:comment "On a reified statement: short qualifier, e.g. 'arrest' for a threat."@en ;
+    rdfs:domain rdf:Statement ; rdfs:range xsd:string .

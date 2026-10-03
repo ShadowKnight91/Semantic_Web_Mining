@@ -1,0 +1,8 @@
+# Optional deep-learning extras for E3 (DistilBERT, Sentence-BERT + MLP) and E4 (GraphSAGE).
+# Install PyTorch first following https://pytorch.org/get-started/locally/ (CPU or CUDA build),
+# then:  pip install -r requirements-deep.txt
+torch>=2.1
+transformers>=4.40
+sentence-transformers>=2.7
+torch_geometric>=2.5      # optional: a pure-PyTorch GraphSAGE fallback is used when missing
+pyshacl>=0.25             # optional: SHACL validation of the exported RDF knowledge graph
