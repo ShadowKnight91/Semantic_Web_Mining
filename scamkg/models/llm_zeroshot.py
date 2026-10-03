@@ -1,6 +1,7 @@
 """LLM zero-shot classification (reference point) and LLM-assisted three-way relabeling (stretch goal)."""
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
@@ -51,11 +52,26 @@ def _run(ctx, ids: list[str], out_path, model, provider) -> dict[str, dict]:
     return done
 
 
+def sample_ids(ctx, ids: list[str], limit: int | None, seed: int) -> list[str]:
+    """Seeded, label-stratified sample of `limit` calls. The data files are sorted by type, so the first
+    N calls of a split would cover one scam script (and a mixed set's first N calls one class only)."""
+    if not limit or len(ids) <= limit:
+        return list(ids)
+    y = ctx.labels(ids)
+    rng = np.random.default_rng(seed)
+    pick: list[int] = []
+    for lab in np.unique(y):
+        idx = np.flatnonzero(y == lab)
+        k = max(1, round(limit * len(idx) / len(ids)))
+        pick.extend(rng.choice(idx, size=min(k, len(idx)), replace=False).tolist())
+    return [ids[i] for i in sorted(pick)]
+
+
 def run_zeroshot(ctx, model: str | None = None, provider: str | None = None, limit: int | None = None) -> None:
     ev = Evaluator(ctx)
     ids = []
     for name, set_ids in ev.eval_sets().items():
-        ids.extend(set_ids[:limit] if limit else set_ids)
+        ids.extend(sample_ids(ctx, set_ids, limit, ctx.seed))
     ids = list(dict.fromkeys(ids))
     model = model or ctx.cfg["llm"]["model"]
     out = ctx.paths.results / f"zeroshot__{slugify(model)}.jsonl"
@@ -69,9 +85,7 @@ def run_zeroshot(ctx, model: str | None = None, provider: str | None = None, lim
 def run_relabel(ctx, model: str | None = None, provider: str | None = None, limit: int | None = None) -> pd.DataFrame:
     """Three-way labels: scams stay 'fraudster'; the LLM splits non-scams into salesperson / prankster / other."""
     ids = ctx.ids(labeled=True)
-    legit = [c for c in ids if ctx.calls.at[c, "label"] == 0]
-    if limit:
-        legit = legit[:limit]
+    legit = sample_ids(ctx, [c for c in ids if ctx.calls.at[c, "label"] == 0], limit, ctx.seed)
     model = model or ctx.cfg["llm"]["model"]
     recs = _run(ctx, legit, ctx.paths.results / f"relabel__{slugify(model)}.jsonl", model, provider)
     rows = []

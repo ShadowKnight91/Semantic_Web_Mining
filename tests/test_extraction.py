@@ -54,6 +54,26 @@ def test_validate_repairs_and_drops(ontology):
     assert len([t for t in triples if t["relation"] == "PAY_VIA"]) == 1
     assert stats["n_dropped"] == 1 and stats["n_repaired"] >= 1 and not stats["conformant"]
     assert next(t for t in triples if t["object"] == "urgency")["inferred"] is True
+    # the model's own (wrong) type is kept for X1 entity-type accuracy
+    assert next(t for t in triples if t["mention"] == "gift card")["raw_type"] == "RequestedAsset"
+
+
+def test_annotations_done_flag_and_entity_type_accuracy(ontology, tmp_path):
+    from scamkg.extraction.evaluate import compare_to_gold, load_annotations
+    path = tmp_path / "gold.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in [
+        {"call_id": "scam", "triples": [{"relation": "PAY_VIA", "object": "gift_card"}]},
+        {"call_id": "wrong_number", "done": True, "triples": []},     # annotated: no caller facts
+        {"call_id": "todo", "done": False, "triples": []},            # not annotated yet
+    ]), encoding="utf-8")
+    gold = load_annotations(path, ontology, EntityStandardizer(ontology))
+    assert gold.keys() == {"scam", "wrong_number"}
+    pred = {"scam": [{"relation": "PAY_VIA", "object_type": "PaymentChannel", "object": "gift_card",
+                      "raw_type": "RequestedAsset"}],
+            "wrong_number": [{"relation": "USES_TACTIC", "object_type": "PressureTactic", "object": "urgency"}]}
+    res = compare_to_gold(pred, gold)
+    assert res["triple_precision"] == 0.5 and res["triple_recall"] == 1.0   # the invented triple is a FP
+    assert res["entity_type_accuracy"] == 0.0                              # judged on the raw type
 
 
 def test_prompt_example_is_schema_conformant(ontology):
@@ -103,3 +123,14 @@ def test_llm_extractor_gives_up(ontology):
     client = FakeClient(["nope", "still nope", "no"])
     rec = LLMExtractor(client, ontology, max_retries=2).extract("c1", "caller: hi")
     assert not rec.json_valid and rec.triples == [] and rec.attempts == 3
+
+
+def test_bare_ivr_digit_is_recovered_from_evidence(ontology):
+    raw = {"triples": [
+        {"relation": "PROVIDES_NUMBER", "object_type": "CallbackNumber", "object": "1", "evidence": "press 1 to start your claim"},
+        {"relation": "PROVIDES_NUMBER", "object_type": "CallbackNumber", "object": "42", "evidence": "dial extension 42"},
+        {"relation": "PROVIDES_NUMBER", "object_type": "CallbackNumber", "object": "7", "evidence": "it takes 7 days"},
+    ]}
+    triples, stats = validate_triples(raw, ontology, EntityStandardizer(ontology))
+    assert _pairs(triples) == {("PROVIDES_NUMBER", "ivr:press-1"), ("PROVIDES_NUMBER", "ext-42")}
+    assert stats["n_dropped"] == 1   # a bare number with no IVR / extension context is still dropped

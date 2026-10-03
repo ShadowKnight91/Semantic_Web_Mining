@@ -261,6 +261,64 @@ def run_cv(ctx, experiments=("E1", "E2", "E2G"), models=None, n_folds: int | Non
     return agg
 
 
+def run_loto(ctx, experiments=("E1", "E2", "E2G"), models=("lr", "xgb")) -> pd.DataFrame:
+    """Leave-one-type-out on the primary data set: hold out every call of one dialogue type (e.g. the
+    BothBosu `ssn` scams or `telemarketing` sales calls), train on the train+val calls of the other
+    types and score the unseen type against test-split calls of the opposite class. Unlike the
+    in-distribution split (where every model is perfect), this measures generalization to an unseen
+    scam script (recall) or an unseen kind of legitimate call (false-positive rate)."""
+    models = list(models or ("lr", "xgb"))
+    thr = float(ctx.cfg["models"].get("threshold", 0.5))
+    params_path = ctx.paths.results / "best_params.json"
+    best = load_json(params_path) if params_path.exists() else {}
+    prim = ctx.calls[(ctx.calls["dataset"] == ctx.primary) & (ctx.calls["label"] >= 0)]
+    types = sorted(t for t in prim["subtype"].unique() if t)
+    if len(types) < 2:
+        log.warning("Leave-one-type-out needs dialogue types (subtype column) in the primary data set")
+        return pd.DataFrame()
+    rows = []
+    for t in types:
+        held = prim[prim["subtype"] == t]
+        if held["label"].nunique() != 1:
+            log.warning("Type %r mixes scam and legitimate calls - skipped", t)
+            continue
+        lab = int(held["label"].iloc[0])
+        fit = prim[(prim["subtype"] != t) & prim["split"].isin(["train", "val"])].index.tolist()
+        test = held.index.tolist() + prim[(prim["split"] == "test") & (prim["label"] != lab)].index.tolist()
+        yfit, ytest = ctx.labels(fit), ctx.labels(test)
+        for exp in experiments:
+            if EXPERIMENT_SPECS[exp]["graph"] and ctx.kg is None:
+                continue
+            fitted, gdf = fit_assembler(ctx, exp, fit)
+            Xfit, Xtest = assemble(ctx, fitted, gdf, fit), assemble(ctx, fitted, gdf, test)
+            for m in models:
+                params = best.get(f"{exp}__{m}", {}).get("params", DEFAULT_PARAMS[m])
+                s = predict_scores(make_model(m, params, ctx.seed, yfit).fit(Xfit, yfit), Xtest)
+                rows.append({"held_out_type": t, "held_out_label": lab, "experiment": exp, "model": m,
+                             "held_out_flag_rate": float((s[:len(held)] >= thr).mean()),
+                             **binary_metrics(ytest, s, thr)})
+        log.info("Leave-one-type-out: %s done", t)
+    df = pd.DataFrame(rows)
+    df.to_csv(ctx.paths.results / "loto.csv", index=False)
+    summary = loto_summary(df)
+    summary.to_csv(ctx.paths.results / "loto_summary.csv", index=False)
+    for _, r in summary.iterrows():
+        log.info("LOTO %-6s %-4s %-4s %s %.3f | PR-AUC %.3f", r["held_out"], r["experiment"], r["model"],
+                 "recall on unseen scam type" if r["held_out"] == "scam" else "false-positive rate on unseen type",
+                 r["held_out_flag_rate"], r["pr_auc"])
+    return df
+
+
+def loto_summary(df: pd.DataFrame) -> pd.DataFrame:
+    """Mean over held-out types: flag rate = recall for unseen scam types, FPR for unseen legitimate types."""
+    if df.empty:
+        return df
+    out = (df.assign(held_out=df["held_out_label"].map({1: "scam", 0: "legit"}))
+           .groupby(["held_out", "experiment", "model"])[["held_out_flag_rate", "pr_auc", "roc_auc"]].mean()
+           .reset_index())
+    return out.sort_values(["held_out", "experiment", "model"], ascending=[False, True, True])
+
+
 def run_multiclass(ctx, experiment: str = "E2") -> dict:
     """Stretch goal: fraudster / salesperson / prankster / other_legitimate (labels from data or LLM relabeling)."""
     label3 = ctx.calls["label3"].copy()

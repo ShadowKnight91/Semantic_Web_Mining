@@ -167,7 +167,7 @@ def run_graphsage(ctx) -> None:
             if wait >= int(gcfg.get("patience", 30)):
                 break
         if epoch % 25 == 0:
-            log.info("GraphSAGE epoch %3d loss %.4f val PR-AUC %.4f", epoch, float(loss), ap)
+            log.info("GraphSAGE epoch %3d loss %.4f val PR-AUC %.4f", epoch, loss.item(), ap)
     model.load_state_dict(best_state)
     model.eval()
     with torch.no_grad():
@@ -178,12 +178,27 @@ def run_graphsage(ctx) -> None:
     eval_ids = ev.eval_ids()
     ev.evaluate("E4", "graphsage", pd.Series(prob[[idx[c] for c in eval_ids]], index=eval_ids),
                 extra={"val_pr_auc": best_ap, "epochs": epoch + 1})
+    np.savez_compressed(embeddings_path(ctx), ids=np.array(ctx.kg.call_ids), emb=emb)
+    torch.save(best_state, ctx.paths.models / "graphsage.pt")
 
-    # GraphSAGE as an embedding generator for XGBoost
+
+def embeddings_path(ctx):
+    return ctx.paths.models / "graphsage_call_embeddings.npz"
+
+
+def run_graphsage_xgb(ctx) -> None:
+    """GraphSAGE as an embedding generator for XGBoost. Kept apart from run_graphsage (and free of
+    torch) because PyTorch and XGBoost cannot share a process on macOS (clashing OpenMP runtimes)."""
+    path = embeddings_path(ctx)
+    if not path.exists():
+        log.warning("No GraphSAGE embeddings (%s) - run E4 first", path.name)
+        return
+    z = np.load(path, allow_pickle=False)
+    emb = dict(zip(z["ids"].tolist(), z["emb"]))
+    ev = Evaluator(ctx)
+    eval_ids = ev.eval_ids()
     fit_ids = ctx.train_ids + ctx.val_ids
     yfit = ctx.labels(fit_ids)
-    xgb = make_model("xgb", {}, seed, yfit).fit(emb[[idx[c] for c in fit_ids]], yfit)
-    ev.evaluate("E4", "graphsage_xgb", pd.Series(xgb.predict_proba(emb[[idx[c] for c in eval_ids]])[:, 1],
+    xgb = make_model("xgb", {}, ctx.seed, yfit).fit(np.stack([emb[c] for c in fit_ids]), yfit)
+    ev.evaluate("E4", "graphsage_xgb", pd.Series(xgb.predict_proba(np.stack([emb[c] for c in eval_ids]))[:, 1],
                                                  index=eval_ids))
-    np.savez_compressed(ctx.paths.models / "graphsage_call_embeddings.npz", ids=np.array(ctx.kg.call_ids), emb=emb)
-    torch.save(best_state, ctx.paths.models / "graphsage.pt")

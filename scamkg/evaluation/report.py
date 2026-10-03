@@ -43,6 +43,8 @@ def build_report(ctx) -> str:
                 gen.to_csv(res / "generalization.csv", index=False)
                 md += ["\n### Recall / PR-AUC drop vs. in-distribution test\n", md_table(gen)]
     for fname, title in (("cv_results.csv", "5-fold stratified cross-validation (mean / std)"),
+                         ("loto_summary.csv", "Leave-one-type-out (flag rate = recall on unseen scam types, "
+                                              "false-positive rate on unseen legitimate types)"),
                          ("significance.csv", "McNemar tests (E1 vs graph-enhanced)"),
                          ("extraction_quality.csv", "Extraction quality (X1)")):
         p = res / fname

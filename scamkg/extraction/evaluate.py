@@ -36,11 +36,15 @@ Each line of `annotator_A.jsonl` / `annotator_B.jsonl` is one call. Read the tra
 
 Example line:
 ```json
-{"call_id": "bothbosu_00012", "annotator": "A", "triples": [
+{"call_id": "bothbosu_00012", "annotator": "A", "done": true, "triples": [
   {"relation": "CLAIMS_TO_BE", "object": "government_agent"},
   {"relation": "USES_TACTIC", "object": "threat", "inferred": false}]}
 ```
-Full allowed values and descriptors: `ontology/ontology.yaml`. Annotate independently; afterwards
+Set `"done": true` on every call you have annotated - also when the caller states no ontology facts
+at all (e.g. a wrong number): such a call stays a gold example with no triples, so any triple an
+extractor invents for it counts as a false positive. Calls with `"done": false` and no triples are
+treated as not yet annotated. Full allowed values and descriptors: `ontology/ontology.yaml`.
+Annotate independently; afterwards
 adjudicate disagreements into `gold.jsonl` (same format). `python -m scamkg eval-extraction`
 reports agreement and scores every extraction run.
 """
@@ -64,10 +68,11 @@ def create_annotation_sample(calls: pd.DataFrame, out_dir: Path, n: int = 50, se
     for annot in ("A", "B"):
         path = out_dir / f"annotator_{annot}.jsonl"
         if not path.exists():
-            write_jsonl(path, ({"call_id": cid, "annotator": annot, "triples": []} for cid in sample.index))
+            write_jsonl(path, ({"call_id": cid, "annotator": annot, "done": False, "triples": []}
+                               for cid in sample.index))
     (out_dir / "README.md").write_text(ANNOTATION_GUIDE, encoding="utf-8")
     if from_synthetic and "gold_triples" in sample.columns:
-        write_jsonl(out_dir / "gold.jsonl", ({"call_id": cid, "annotator": "synthetic",
+        write_jsonl(out_dir / "gold.jsonl", ({"call_id": cid, "annotator": "synthetic", "done": True,
                                                "triples": r["gold_triples"] or []} for cid, r in sample.iterrows()))
         log.info("Wrote synthetic gold triples for %d calls", len(sample))
     log.info("Annotation sample of %d calls written to %s", len(sample), out_dir)
@@ -75,8 +80,12 @@ def create_annotation_sample(calls: pd.DataFrame, out_dir: Path, n: int = 50, se
 
 
 def load_annotations(path: Path, ontology: Ontology, standardizer: EntityStandardizer) -> dict[str, list[dict]]:
+    """Annotated calls only: a record counts once it has triples or is marked `"done": true` (a call whose
+    caller states no ontology facts, e.g. a wrong number, is a valid gold example with no triples)."""
     out = {}
     for rec in read_jsonl(path):
+        if not rec.get("triples") and not rec.get("done"):
+            continue
         raw = []
         for t in rec.get("triples", []):
             t = dict(t)
@@ -112,12 +121,14 @@ def compare_to_gold(pred: dict[str, list[dict]], gold: dict[str, list[dict]]) ->
             per_rel[rel][2] += 1
         macro_p.append(len(inter) / len(p) if p else (1.0 if not g else 0.0))
         macro_r.append(len(inter) / len(g) if g else 1.0)
-        gold_types = {match_key(t["object"]): t["object_type"] for t in gtriples}
+        # entity-type accuracy judges the type the extractor itself gave (before schema repair) for objects
+        # that also occur in the gold triples; "other" exists in several types, so it identifies nothing
+        gold_types = {match_key(t["object"]): t["object_type"] for t in gtriples if t["object"] != "other"}
         for t in pred.get(cid, []):
             k = match_key(t["object"])
             if k in gold_types:
                 type_total += 1
-                type_correct += int(gold_types[k] == t["object_type"])
+                type_correct += int(gold_types[k] == t.get("raw_type", t["object_type"]))
     prec = tp / (tp + fp) if tp + fp else 0.0
     rec = tp / (tp + fn) if tp + fn else 0.0
     f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
@@ -147,11 +158,10 @@ def evaluate_extraction_runs(extractions_dir: Path, annotations_dir: Path, ontol
     elif a_path.exists():
         gold = load_annotations(a_path, ontology, standardizer)
         log.info("No gold.jsonl - using annotator A as reference")
-    gold = {k: v for k, v in gold.items() if v} if gold else {}
     if a_path.exists() and b_path.exists():
-        a = {k: v for k, v in load_annotations(a_path, ontology, standardizer).items() if v}
+        a = load_annotations(a_path, ontology, standardizer)
         b = load_annotations(b_path, ontology, standardizer)
-        common = {k: v for k, v in a.items() if b.get(k)}
+        common = {k: v for k, v in a.items() if k in b}
         if common:
             agree = compare_to_gold({k: b[k] for k in common}, common)
             report["inter_annotator"] = {"calls": len(common), "triple_f1": agree["triple_f1"],

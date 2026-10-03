@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from sklearn.metrics import roc_auc_score
 
 from scamkg.graph.build import CallKG
 from scamkg.graph.features import GraphFeatureBuilder, label_features
@@ -57,6 +58,21 @@ def test_features_do_not_depend_on_unlabeled_labels(ontology):
     assert not np.allclose(f1.loc["b", cols].to_numpy(dtype=float), f3.loc["b", cols].to_numpy(dtype=float))
     # ... but a's own similarity-to-scams ignores a itself (leave-one-out)
     assert f1.at["a", "sim_scam_max"] == f3.at["a", "sim_scam_max"] == 1.0
+
+
+def test_training_features_do_not_encode_own_label(ontology):
+    """Ten calls share one entity. Leave-one-out rates are lower for every scam than for every
+    legitimate call (the label is readable from the feature); out-of-fold rates are not."""
+    gov = _t("CLAIMS_TO_BE", "ClaimedIdentity", "government_agent")
+    ids = [f"c{i}" for i in range(10)]
+    kg = CallKG(ids, {c: [gov] for c in ids}, ontology)
+    y = np.array([1, 0] * 5)
+    gcfg = {"betweenness_samples": 0, "similarity_top_k": 3, "similarity_min": 0.1}
+    loo = GraphFeatureBuilder(kg, {**gcfg, "label_folds": 1}).build(ids, y)
+    oof = GraphFeatureBuilder(kg, {**gcfg, "label_folds": 5}).build(ids, y)
+    for col in ("entity_risk_mean", "knn_scam_rate", "sim_scam_topk"):
+        assert roc_auc_score(y, loo[col]) == 0.0, col
+        assert roc_auc_score(y, oof[col]) == 0.5, col
 
 
 def test_leak_safety_on_demo(demo_ctx):

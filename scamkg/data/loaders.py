@@ -28,6 +28,10 @@ SCAM_STRINGS = {"1", "scam", "fraud", "fraudulent", "yes", "true", "spam", "mali
                 "scammer", "suspicious"}
 LEGIT_STRINGS = {"0", "non scam", "nonscam", "not scam", "no scam", "legit", "legitimate", "normal", "no", "false",
                  "ham", "genuine", "benign", "non fraud", "not fraud"}
+# BothBosu's dialogue types give gold three-way labels (stretch goal): every scam type is a fraudster,
+# insurance / telemarketing offers are salespeople, deliveries and wrong numbers are other legitimate calls.
+BOTHBOSU_LABEL3 = {"insurance": "salesperson", "telemarketing": "salesperson", "delivery": "other_legitimate",
+                   "wrong": "other_legitimate"}
 
 
 def unify_label(v) -> int:
@@ -121,8 +125,11 @@ def load_bothbosu(cfg: dict, paths: Paths) -> pd.DataFrame | None:
     sub_col = _find_col(df, SUBTYPE_CANDIDATES)
     if text_col is None or label_col is None:
         raise KeyError(f"BothBosu: cannot find text/label columns in {list(df.columns)}")
-    return _frame("bothbosu", df[text_col].astype(str), df[label_col], df.index.astype(str),
-                  df[sub_col] if sub_col else None)
+    out = _frame("bothbosu", df[text_col].astype(str), df[label_col], df.index.astype(str),
+                 df[sub_col] if sub_col else None)
+    out["label3"] = ["fraudster" if lab == 1 else BOTHBOSU_LABEL3.get(st.lower(), "") if lab == 0 else ""
+                     for lab, st in zip(out["label"], out["subtype"])]
+    return out
 
 
 def load_kaggle(cfg: dict, paths: Paths) -> pd.DataFrame | None:

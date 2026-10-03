@@ -33,7 +33,8 @@ ORDER BY size DESC LIMIT 20;
 MATCH (c:Call {call_id: 'bothbosu_00012'})-[s:SIMILAR_TO]-(o:Call)
 RETURN o.call_id, o.split, o.gold_label, s.score ORDER BY s.score DESC LIMIT 10;
 
-// 8. Call-back numbers shared by several calls (possible scam operations)
+// 8. Call-back numbers shared by several calls (possible scam operations; IVR prompts / extensions excluded)
 MATCH (n:CallbackNumber)<-[:PROVIDES_NUMBER]-(c:Call)
+WHERE NOT n.name STARTS WITH 'ivr:' AND NOT n.name STARTS WITH 'ext-'
 WITH n, collect(c.call_id) AS calls WHERE size(calls) > 1
 RETURN n.name, size(calls) AS n_calls, calls ORDER BY n_calls DESC;

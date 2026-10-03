@@ -42,15 +42,20 @@ flowchart LR
 | X2 cross-dataset (train BothBosu, test Kaggle + NCSU) | automatic in every `train` | `scamkg/evaluation/evaluator.py` |
 | Realistic ~5% scam test split | automatic (`test_imbalanced`, mean +- std over 20 draws) | `scamkg/evaluation/evaluator.py` |
 | 5-fold stratified CV, McNemar test | `cv`, `significance` | `scamkg/models/classical.py`, `scamkg/evaluation/stats.py` |
+| Generalization to unseen scam scripts / legitimate call types (leave-one-type-out) | `loto` | `scamkg/models/classical.py` |
 | Ablations: each entity type, each feature group | `ablate` | `scamkg/evaluation/ablation.py` |
 | Explainability: identity-tactic-asset path per flagged call | `explain`, `predict`, dashboard | `scamkg/evaluation/explain.py`, `scamkg/predict.py` |
-| Stretch: fraudster / salesperson / prankster via LLM relabeling | `relabel`, `multiclass` | `scamkg/models/llm_zeroshot.py` |
+| Stretch: fraudster / salesperson / prankster (BothBosu types give gold labels; LLM relabeling for other data) | `multiclass`, `relabel` | `scamkg/data/loaders.py`, `scamkg/models/llm_zeroshot.py` |
 | Optional BankSim reference baseline | `banksim` | `scamkg/models/banksim.py` |
 | Deliverables: ontology, KG, Neo4j dump, models, dashboard, report | `build-graph`, `report`, `dashboard` | `results/`, `data/kg/`, `artifacts/` |
 
 ## Setup
 
-Python 3.11+ (tested with 3.14 on Windows).
+Python 3.11+ (tested with 3.14 on Windows and 3.12 on macOS / Apple Silicon).
+
+macOS: XGBoost needs the OpenMP runtime - `brew install libomp`. PyTorch ships its own, incompatible OpenMP
+runtime, so the torch parts of E3/E4 run in a separate worker process (XGBoost segfaults or deadlocks once both
+have run in one process).
 
 ```bash
 python -m venv .venv
@@ -107,7 +112,8 @@ Outputs go to `data/demo/`, `results/demo/` (see `results/demo/REPORT.md`) and `
    ```
 
 2. **LLM setup.** Pull the two open-source models (or point `llm.provider: voyager` at ASU Voyager's
-   OpenAI-compatible endpoint via `VOYAGER_BASE_URL` / `VOYAGER_API_KEY`). Pilot on 20 calls first:
+   OpenAI-compatible endpoint via `VOYAGER_BASE_URL` / `VOYAGER_API_KEY`). Pilot on 20 calls first (`--limit`
+   draws a seeded random sample, so the pilot is not 20 calls of one scam type):
 
    ```bash
    ollama pull qwen2.5:7b
@@ -124,13 +130,15 @@ Outputs go to `data/demo/`, `results/demo/` (see `results/demo/REPORT.md`) and `
 3. **Full extraction**, comparing two LLMs, a prompt ablation, and the rule-based baseline. Runs resume
    after interruption, every response is cached in `data/cache/llm/`, and each run records model,
    prompt version + hash, seed and temperature in `<run>.meta.json`.
+   The prompt ablation only needs the annotated calls (X1 scores them), so `--ids-file` limits it to
+   the 50-call annotation sample instead of extracting every call once per prompt variant.
 
    ```bash
    .venv\Scripts\python -m scamkg extract --extractor llm --model qwen2.5:7b gemma2:9b
    ```
 
    ```bash
-   .venv\Scripts\python -m scamkg extract --extractor llm --model qwen2.5:7b --prompt-version v2_no_descriptors v3_no_example v0_open --splits test
+   .venv\Scripts\python -m scamkg extract --extractor llm --model qwen2.5:7b --prompt-version v2_no_descriptors v3_no_example v0_open --ids-file data/annotations/sample.jsonl
    ```
 
    ```bash
@@ -170,6 +178,10 @@ Outputs go to `data/demo/`, `results/demo/` (see `results/demo/REPORT.md`) and `
 
    ```bash
    .venv\Scripts\python -m scamkg cv
+   ```
+
+   ```bash
+   .venv\Scripts\python -m scamkg loto
    ```
 
    ```bash
@@ -223,7 +235,9 @@ docker compose up -d neo4j
 Neo4j Browser is at http://localhost:7474 (user `neo4j`, password from `.env`). `build-graph --backend neo4j`
 loads `(:Call)-[:CLAIMS_TO_BE|MENTIONS_ORG|USES_TACTIC|REQUESTS|PAY_VIA|PROVIDES_NUMBER]->(entity)`,
 writes `SIMILAR_TO` edges with `gds.nodeSimilarity` and `community` with `gds.louvain`, and streams
-degree / PageRank / betweenness back into the pipeline. Example queries: `neo4j/queries.cypher`.
+degree / PageRank / betweenness back into the pipeline. Later commands (`train`, `loto`, ...) use the
+features of the most recent `build-graph` for that extraction run, so run `build-graph` again to switch back
+to networkx. Example queries: `neo4j/queries.cypher`.
 Database dump for the deliverable:
 
 ```bash
@@ -254,6 +268,7 @@ The dump lands in `neo4j/dumps/`. Without Docker, any Neo4j 5 server with the GD
 | `results/metrics.csv` | every model x evaluation set (test, test_imbalanced, each external set) |
 | `results/predictions/*.csv` | per-call scores of every model |
 | `results/cv_results.csv`, `significance.csv`, `generalization.csv` | CV mean +- std, McNemar, recall drop |
+| `results/loto.csv`, `loto_summary.csv` | leave-one-type-out: recall on unseen scam types, false-positive rate on unseen legitimate types |
 | `results/extraction_quality.csv` | X1 per extraction run |
 | `results/clustering.json`, `scam_scripts.md` | E5 metrics and discovered scripts |
 | `results/ablation.csv` | entity-type and feature-group ablations |
@@ -266,8 +281,12 @@ The dump lands in `neo4j/dumps/`. Without Docker, any Neo4j 5 server with the GD
 * Graph structure (PageRank, degree, betweenness, Louvain, Jaccard) is label-free.
 * Every label-derived feature (community scam rate, similarity to known scams, k-NN scam rate, entity
   risk) is rebuilt for each training set from **training labels only** (train for tuning, train+val for
-  the final model, the fold's train part in CV), with leave-one-out values for training calls
-  (`tests/test_features.py`).
+  the final model, the fold's train part in CV). Training calls get **out-of-fold** values (5-fold
+  cross-fitting, `graph.label_folds`): leave-one-out alone leaks, because within a community the LOO
+  rate of every scam is lower than that of every legitimate call (`tests/test_features.py`).
+* Mixed external sets that draw from the primary data set use only its held-out test split.
+* Cached structural features are keyed by the content of the extraction run, so re-extracting under
+  the same run name never reuses stale graph features.
 * Hyper-parameters are tuned by randomized search on the validation split only.
 * LLM extraction: temperature 0.1, fixed seed, capped output length, JSON validation with retry, schema
   repair, entity standardization, and a grounding check that drops triples whose evidence/mention is not
@@ -310,8 +329,15 @@ tests/           pytest suite (runs offline on synthetic data)
 ## Notes
 
 * The NCSU robocall set contains only illegal robocalls (label 1), so only recall is defined on it alone;
-  the `ncsu+kaggle` evaluation set pairs its calls with Kaggle's legitimate calls for PR-AUC.
+  the `ncsu+kaggle` evaluation set pairs its calls with Kaggle's legitimate calls for PR-AUC. Until the
+  Kaggle set is available, `ncsu+bothbosu_test` pairs them with BothBosu's held-out legitimate test calls
+  (a style-confounded proxy: robocall monologues vs. dialogues).
+* In-distribution BothBosu scores saturate (every model, even TF-IDF + LR, reaches PR-AUC 1.0, and so does
+  validation, so tuning cannot separate candidates). Use `loto` and the external sets to answer the RQs.
 * `data.sources.kaggle.slug` is left empty because the proposal does not name the Kaggle owner; set it
   once the team fixes the exact data set.
 * Small local models (e.g. `qwen2.5:0.5b`) produce valid JSON but noisy, sometimes copied triples; use
   7B+ models (or Voyager) for the real extraction runs.
+* Throughput on an M1 Pro (16 GB): `qwen2.5:7b` about 15 s per call (roughly 9-10 h for all 2,312 calls),
+  `gemma2:9b` about 20 s. Ollama answers one request at a time unless it is started with
+  `OLLAMA_NUM_PARALLEL` > 1, so `--workers` only helps then. Runs resume, so they can span several sessions.

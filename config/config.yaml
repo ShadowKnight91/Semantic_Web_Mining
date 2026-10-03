@@ -19,6 +19,9 @@ data:
   external: [kaggle, ncsu]         # cross-dataset generalization sets (X2)
   mixed_external:                  # [positives from, negatives from] -> realistic two-class set
     - [ncsu, kaggle]
+    # Until Kaggle is available: real robocalls vs. the primary set's held-out legitimate TEST calls
+    # (never trained on). Style-confounded (monologues vs. dialogues) - a proxy, not a replacement.
+    - [ncsu, bothbosu]
   val_size: 0.15
   test_size: 0.15
   min_words: 5
@@ -85,6 +88,7 @@ graph:
   knn_k: 10
   sim_topk: 5
   smoothing: 2.0                   # Bayesian smoothing for leak-safe label rates
+  label_folds: 5                   # out-of-fold label features for training calls (1 = leave-one-out)
   onehot_min_count: 2              # entity one-hot columns need >= this many calls
 
 neo4j:
@@ -110,6 +114,7 @@ models:
     sublinear_tf: true
   transformer:
     model_name: distilbert-base-uncased
+    device: auto                   # auto = cuda > mps (Apple silicon) > cpu; cpu for bit-reproducible runs
     max_length: 256
     epochs: 3
     batch_size: 16

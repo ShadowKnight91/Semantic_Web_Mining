@@ -14,10 +14,14 @@ Each line of `annotator_A.jsonl` / `annotator_B.jsonl` is one call. Read the tra
 
 Example line:
 ```json
-{"call_id": "bothbosu_00012", "annotator": "A", "triples": [
+{"call_id": "bothbosu_00012", "annotator": "A", "done": true, "triples": [
   {"relation": "CLAIMS_TO_BE", "object": "government_agent"},
   {"relation": "USES_TACTIC", "object": "threat", "inferred": false}]}
 ```
-Full allowed values and descriptors: `ontology/ontology.yaml`. Annotate independently; afterwards
+Set `"done": true` on every call you have annotated - also when the caller states no ontology facts
+at all (e.g. a wrong number): such a call stays a gold example with no triples, so any triple an
+extractor invents for it counts as a false positive. Calls with `"done": false` and no triples are
+treated as not yet annotated. Full allowed values and descriptors: `ontology/ontology.yaml`.
+Annotate independently; afterwards
 adjudicate disagreements into `gold.jsonl` (same format). `python -m scamkg eval-extraction`
 reports agreement and scores every extraction run.

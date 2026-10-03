@@ -129,8 +129,9 @@ class CachedLLMClient:
 
     def _key(self, messages: list[dict]) -> str:
         c = self.client
+        # max_tokens is part of the key: raising it must not replay responses that were cut off
         return sha256_text(json.dumps({"p": c.provider, "m": c.model, "t": c.temperature, "s": c.seed,
-                                       "j": c.json_mode, "msg": messages}, sort_keys=True))
+                                       "j": c.json_mode, "n": c.max_tokens, "msg": messages}, sort_keys=True))
 
     def chat(self, messages: list[dict]) -> str:
         key = self._key(messages)
