@@ -334,8 +334,8 @@ def cmd_run_all(args, cfg):
     elif args.download:
         cmd_download(args, cfg)
     cmd_preprocess(args, cfg)
-    cmd_extract(ns(extractor=args.extractor, datasets=None, splits=None, model=args.model, prompt_version=None,
-                   provider=None, run_name=None, no_resume=False, workers=None, limit=None), cfg)
+    cmd_extract(ns(extractor=args.extractor, datasets=None, splits=None, ids_file=None, model=args.model,
+                   prompt_version=None, provider=None, run_name=None, no_resume=False, workers=None, limit=None), cfg)
     cmd_build_graph(ns(run=None, backend="neo4j" if args.with_neo4j else None, no_rdf=False), cfg)
     cmd_eda(ns(run=None), cfg)
     cmd_annotate_sample(ns(n=50, from_synthetic=demo), cfg)

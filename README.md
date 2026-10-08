@@ -95,9 +95,12 @@ Outputs go to `data/demo/`, `results/demo/` (see `results/demo/REPORT.md`) and `
 
 ## Running on the real data
 
-1. **Data** (Table I). BothBosu and NCSU download automatically. For Kaggle, either set
-   `data.sources.kaggle.slug` in `config/config.yaml` (Kaggle CLI is used) or put the CSV into
-   `data/raw/kaggle/`; column names are auto-detected (override with `text_col`, `label_col`, `id_col`).
+1. **Data** (Table I). BothBosu and NCSU download automatically. The Kaggle set
+   (`teeconnie/scam-and-non-scam-call-conversation-dataset`, 400 scam + 400 non-scam calls) downloads with the
+   Kaggle CLI when it is configured (`~/.kaggle/kaggle.json`); otherwise put its `English_Scam.txt` /
+   `English_NonScam.txt` into `data/raw/kaggle/`. CSV / JSON tables work too (columns are auto-detected; override
+   with `text_col`, `label_col`, `id_col`). Its license (CC BY-NC-ND) forbids redistributing modified copies, so
+   keep it out of git (`data/` is ignored).
 
    ```bash
    .venv\Scripts\python -m scamkg download
@@ -241,14 +244,15 @@ to networkx. Example queries: `neo4j/queries.cypher`.
 Database dump for the deliverable:
 
 ```bash
-docker compose stop neo4j
+docker compose stop -t 120 neo4j
 ```
 
 ```bash
-docker compose run --rm neo4j neo4j-admin database dump neo4j --to-path=/dumps
+docker compose run --rm neo4j neo4j-admin database dump neo4j --to-path=/dumps --overwrite-destination=true
 ```
 
-The dump lands in `neo4j/dumps/`. Without Docker, any Neo4j 5 server with the GDS plugin works.
+The dump lands in `neo4j/dumps/`. The `-t 120` gives Neo4j time to checkpoint after a large load; a hard stop
+leaves an active transaction log and the dump refuses to run (start and stop it again to recover). Without Docker, any Neo4j 5 server with the GDS plugin works.
 
 ## Semantic-web artefacts
 
@@ -291,7 +295,9 @@ The dump lands in `neo4j/dumps/`. Without Docker, any Neo4j 5 server with the GD
 * LLM extraction: temperature 0.1, fixed seed, capped output length, JSON validation with retry, schema
   repair, entity standardization, and a grounding check that drops triples whose evidence/mention is not
   in the transcript (e.g. content copied from the few-shot example). Inferred facts are flagged.
-* Everything is seeded (`project.seed`); results rows record the extraction run used.
+* Everything is seeded (`project.seed`); results rows record the extraction run used. Call ids are numbered
+  per data set before cross-data-set de-duplication, so adding a data set never renames existing calls
+  (annotations, LLM runs and caches refer to them).
 
 ## Repository layout
 
@@ -329,13 +335,18 @@ tests/           pytest suite (runs offline on synthetic data)
 ## Notes
 
 * The NCSU robocall set contains only illegal robocalls (label 1), so only recall is defined on it alone;
-  the `ncsu+kaggle` evaluation set pairs its calls with Kaggle's legitimate calls for PR-AUC. Until the
-  Kaggle set is available, `ncsu+bothbosu_test` pairs them with BothBosu's held-out legitimate test calls
-  (a style-confounded proxy: robocall monologues vs. dialogues).
+  the `ncsu+kaggle` evaluation set pairs its calls with Kaggle's legitimate calls for PR-AUC. "Illegal
+  robocall" is not always fraud: some are aggressive telemarketing (warranties, interest rates).
+* Kaggle calls are caller-only monologues with template slots (`[Greetings]`, `[Company]`, `[Money]`...).
+  Cleaning removes the slots; this matters because `[Greetings]` opens every non-scam call but only 77% of
+  the scams, and `[Money]` / `[Link]` occur only in scams. One Kaggle scam is a verbatim NCSU robocall; the
+  duplicate is kept once (in Kaggle).
 * In-distribution BothBosu scores saturate (every model, even TF-IDF + LR, reaches PR-AUC 1.0, and so does
   validation, so tuning cannot separate candidates). Use `loto` and the external sets to answer the RQs.
-* `data.sources.kaggle.slug` is left empty because the proposal does not name the Kaggle owner; set it
-  once the team fixes the exact data set.
+* On shifted data, recall / precision / F1 at the 0.5 threshold mostly measure calibration: a model can rank
+  the Kaggle calls well (PR-AUC 0.89) and still flag almost none of them at 0.5. Compare models with PR-AUC,
+  ROC-AUC and `recall_at_fpr10` (recall when each model's threshold flags 10% of the set's legitimate calls).
+  McNemar tests use the 0.5 threshold and inherit the same caveat.
 * Small local models (e.g. `qwen2.5:0.5b`) produce valid JSON but noisy, sometimes copied triples; use
   7B+ models (or Voyager) for the real extraction runs.
 * Throughput on an M1 Pro (16 GB): `qwen2.5:7b` about 15 s per call (roughly 9-10 h for all 2,312 calls),

@@ -95,3 +95,23 @@ def test_zeroshot_sample_is_stratified(demo_ctx):
     pick = sample_ids(demo_ctx, ids, 20, seed=0)
     assert len(pick) == 20 and set(demo_ctx.labels(pick)) == {0, 1}
     assert pick == sample_ids(demo_ctx, ids, 20, seed=0) and sample_ids(demo_ctx, ids, None, 0) == ids
+
+
+def test_run_all_end_to_end(tmp_path):
+    """The run-all entry point wires every command together (catches argument-plumbing errors)."""
+    from scamkg.cli import main
+    from scamkg.config import get_paths, load_config
+    override = tmp_path / "cfg.yaml"
+    override.write_text(
+        "paths: {" + ", ".join(f"{k}: '{tmp_path / k}'" for k in ("data_raw", "data_processed", "kg", "cache",
+                                                                    "annotations", "results", "artifacts")) + "}\n"
+        "data: {load: [demo], primary: demo_primary, external: [demo_shifted, demo_robocall],"
+        " mixed_external: [[demo_robocall, demo_shifted]], imbalanced_test: {n_draws: 3}}\n"
+        "models: {search_iter: 1, classical: [lr], cv_folds: 2}\n"
+        "graph: {betweenness_samples: 30}\n", encoding="utf-8")
+    from scamkg.data.synthetic import generate_demo_data
+    cfg = load_config(override)
+    generate_demo_data(get_paths(cfg).ensure().raw, n_primary=120, n_shifted=40, n_robocall=20, seed=3)
+    assert main(["--config", str(override), "run-all", "--skip-deep"]) == 0
+    report = (tmp_path / "results" / "REPORT.md").read_text(encoding="utf-8")
+    assert "Leave-one-type-out" in report and "Cross-dataset generalization" in report

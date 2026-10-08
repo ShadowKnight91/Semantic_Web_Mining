@@ -6,7 +6,16 @@ import pandas as pd
 from sklearn.metrics import (accuracy_score, adjusted_rand_score, average_precision_score, f1_score,
                              normalized_mutual_info_score, precision_score, recall_score, roc_auc_score)
 
-METRICS = ["precision", "recall", "f1", "pr_auc", "roc_auc", "accuracy"]
+METRICS = ["precision", "recall", "f1", "pr_auc", "roc_auc", "recall_at_fpr10", "accuracy"]
+
+
+def recall_at_fpr(y, s, fpr: float = 0.10) -> float:
+    """Recall when the threshold flags `fpr` of the negatives: a fixed false-alarm operating point that, unlike
+    recall at 0.5, does not depend on how well a model's scores are calibrated for a shifted data set."""
+    neg, pos = s[y == 0], s[y == 1]
+    if not len(neg) or not len(pos):
+        return float("nan")
+    return float((pos > np.quantile(neg, 1 - fpr)).mean())
 
 
 def binary_metrics(y_true, scores, threshold: float = 0.5) -> dict:
@@ -22,6 +31,7 @@ def binary_metrics(y_true, scores, threshold: float = 0.5) -> dict:
         "f1": float(f1_score(y, pred, zero_division=0)),
         "pr_auc": float(average_precision_score(y, s)) if both else float("nan"),
         "roc_auc": float(roc_auc_score(y, s)) if both else float("nan"),
+        "recall_at_fpr10": recall_at_fpr(y, s, 0.10),
         "accuracy": float(accuracy_score(y, pred)),
         "mean_score": float(s.mean()) if len(s) else float("nan"),
     }

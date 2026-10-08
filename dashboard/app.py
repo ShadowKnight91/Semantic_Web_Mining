@@ -164,7 +164,8 @@ with tabs[2]:
         else:
             for es, sub in ext.groupby("eval_set"):
                 st.subheader(es)
-                st.dataframe(sub[["experiment", "model", "n", "n_pos", "precision", "recall", "f1", "pr_auc"]].round(4),
+                cols = ["experiment", "model", "n", "n_pos", "precision", "recall", "f1", "pr_auc", "recall_at_fpr10"]
+                st.dataframe(sub[[c for c in cols if c in sub]].round(4),
                              hide_index=True, width="stretch")
             gen = csv("generalization.csv")
             if gen is not None:

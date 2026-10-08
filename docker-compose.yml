@@ -2,8 +2,8 @@
 #   docker compose up -d neo4j          -> Browser at http://localhost:7474 (user neo4j)
 #   python -m scamkg build-graph --backend neo4j
 # Database dump (deliverable):
-#   docker compose stop neo4j
-#   docker compose run --rm neo4j neo4j-admin database dump neo4j --to-path=/dumps
+#   docker compose stop -t 120 neo4j
+#   docker compose run --rm neo4j neo4j-admin database dump neo4j --to-path=/dumps --overwrite-destination=true
 #   docker compose start neo4j
 services:
   neo4j:

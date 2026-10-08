@@ -19,9 +19,8 @@ data:
   external: [kaggle, ncsu]         # cross-dataset generalization sets (X2)
   mixed_external:                  # [positives from, negatives from] -> realistic two-class set
     - [ncsu, kaggle]
-    # Until Kaggle is available: real robocalls vs. the primary set's held-out legitimate TEST calls
-    # (never trained on). Style-confounded (monologues vs. dialogues) - a proxy, not a replacement.
-    - [ncsu, bothbosu]
+    # A pair may also take negatives from the primary set (only its held-out test split is used),
+    # e.g. [ncsu, bothbosu] - a style-confounded proxy (monologues vs. dialogues).
   val_size: 0.15
   test_size: 0.15
   min_words: 5
@@ -33,7 +32,7 @@ data:
       hf_name: BothBosu/scam-dialogue
       local_dir: data/raw/bothbosu
     kaggle:
-      slug: null                   # "<owner>/<dataset>" to download with the Kaggle CLI
+      slug: teeconnie/scam-and-non-scam-call-conversation-dataset   # Kaggle CLI; or drop the files in local_dir
       local_dir: data/raw/kaggle
       text_col: null               # null = auto-detect
       label_col: null

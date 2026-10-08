@@ -6,7 +6,8 @@ import pandas as pd
 from scamkg.utils import get_logger, load_json, md_table
 
 log = get_logger(__name__)
-SHOW = ["experiment", "model", "precision", "recall", "f1", "pr_auc", "roc_auc"]
+SHOW = ["experiment", "model", "n", "precision", "recall", "f1", "pr_auc", "roc_auc",   # n: sampled LLM rows
+        "recall_at_fpr10"]
 
 
 def generalization_table(metrics: pd.DataFrame) -> pd.DataFrame:
