@@ -34,11 +34,16 @@ Each line of `annotator_A.jsonl` / `annotator_B.jsonl` is one call. Read the tra
 | PAY_VIA | PaymentChannel | `gift_card`, `wire_transfer`, `crypto`, `zelle`, `p2p_app`, `bank_transfer`, `cash`, `check_or_money_order`, `credit_card_payment`, `other` |
 | PROVIDES_NUMBER | CallbackNumber | the number as given, e.g. `1-888-555-0142`, `press 1` |
 
-Example line:
+Set `"annotated": true` on every call you have finished - also when the caller states none of these
+facts (then leave `triples` empty). Calls without the flag and without triples are treated as not yet
+annotated and are skipped.
+
+Example lines:
 ```json
-{"call_id": "bothbosu_00012", "annotator": "A", "triples": [
+{"call_id": "bothbosu_00012", "annotator": "A", "annotated": true, "triples": [
   {"relation": "CLAIMS_TO_BE", "object": "government_agent"},
   {"relation": "USES_TACTIC", "object": "threat", "inferred": false}]}
+{"call_id": "bothbosu_00013", "annotator": "A", "annotated": true, "triples": []}
 ```
 Full allowed values and descriptors: `ontology/ontology.yaml`. Annotate independently; afterwards
 adjudicate disagreements into `gold.jsonl` (same format). `python -m scamkg eval-extraction`
@@ -64,7 +69,8 @@ def create_annotation_sample(calls: pd.DataFrame, out_dir: Path, n: int = 50, se
     for annot in ("A", "B"):
         path = out_dir / f"annotator_{annot}.jsonl"
         if not path.exists():
-            write_jsonl(path, ({"call_id": cid, "annotator": annot, "triples": []} for cid in sample.index))
+            write_jsonl(path, ({"call_id": cid, "annotator": annot, "annotated": False, "triples": []}
+                               for cid in sample.index))
     (out_dir / "README.md").write_text(ANNOTATION_GUIDE, encoding="utf-8")
     if from_synthetic and "gold_triples" in sample.columns:
         write_jsonl(out_dir / "gold.jsonl", ({"call_id": cid, "annotator": "synthetic",
@@ -74,9 +80,16 @@ def create_annotation_sample(calls: pd.DataFrame, out_dir: Path, n: int = 50, se
     return out_dir / "sample.jsonl"
 
 
-def load_annotations(path: Path, ontology: Ontology, standardizer: EntityStandardizer) -> dict[str, list[dict]]:
+def load_annotations(path: Path, ontology: Ontology, standardizer: EntityStandardizer,
+                     all_annotated: bool = False) -> dict[str, list[dict]]:
+    """Annotated calls only. CHANGE: a call annotated as having *no* facts is kept with an empty list.
+    Before, every empty call was dropped, so false-positive triples on fact-free (often legitimate)
+    calls were never counted and triple precision was inflated. A call counts as annotated when it has
+    triples, has "annotated": true, or comes from the adjudicated gold.jsonl (`all_annotated`)."""
     out = {}
     for rec in read_jsonl(path):
+        if not (all_annotated or rec.get("triples") or rec.get("annotated")):
+            continue
         raw = []
         for t in rec.get("triples", []):
             t = dict(t)
@@ -143,15 +156,14 @@ def evaluate_extraction_runs(extractions_dir: Path, annotations_dir: Path, ontol
     report: dict = {}
     gold: dict[str, list[dict]] = {}
     if gold_path.exists():
-        gold = load_annotations(gold_path, ontology, standardizer)
+        gold = load_annotations(gold_path, ontology, standardizer, all_annotated=True)
     elif a_path.exists():
         gold = load_annotations(a_path, ontology, standardizer)
         log.info("No gold.jsonl - using annotator A as reference")
-    gold = {k: v for k, v in gold.items() if v} if gold else {}
     if a_path.exists() and b_path.exists():
-        a = {k: v for k, v in load_annotations(a_path, ontology, standardizer).items() if v}
+        a = load_annotations(a_path, ontology, standardizer)
         b = load_annotations(b_path, ontology, standardizer)
-        common = {k: v for k, v in a.items() if b.get(k)}
+        common = {k: v for k, v in a.items() if k in b}
         if common:
             agree = compare_to_gold({k: b[k] for k in common}, common)
             report["inter_annotator"] = {"calls": len(common), "triple_f1": agree["triple_f1"],
@@ -173,6 +185,9 @@ def evaluate_extraction_runs(extractions_dir: Path, annotations_dir: Path, ontol
                "schema_conformance_rate": summ.get("schema_conformance_rate"),
                "mean_triples_per_call": summ.get("mean_triples_per_call"),
                "repaired_rate": summ.get("repaired_rate"), "inferred_rate": summ.get("inferred_rate"),
+               # CHANGE (TA comment 1): how often each fallback layer was needed
+               "retry_rate": summ.get("retry_rate"), "salvage_rate": summ.get("salvage_rate"),
+               "fallback_rate": summ.get("fallback_rate"), "failed_rate": summ.get("failed_rate"),
                "mean_latency_s": summ.get("mean_latency_s")}
         if gold:
             pred = {r["call_id"]: r.get("triples", []) for r in records}

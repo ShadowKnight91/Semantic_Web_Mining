@@ -48,6 +48,17 @@ def build_report(ctx) -> str:
         p = res / fname
         if p.exists():
             md += [f"\n## {title}\n", md_table(pd.read_csv(p))]
+    p = res / "graphsage_fusion.json"
+    if p.exists():   # CHANGE (TA comment 2): document the GraphSAGE input fusion and its block ablation
+        g = load_json(p)
+        fus = g.get("fusion") or {}
+        md += ["\n## GraphSAGE input fusion (E4)\n",
+               f"Text block -> {fus.get('text_dim')}-d, topology block ({len(g.get('topology_features', []))} "
+               f"label-free features) -> {fus.get('topo_dim')}-d, node type -> {fus.get('type_dim')}-d; "
+               "concatenated, LayerNorm, then 2 mean-aggregation SAGE layers. "
+               f"Training graph: {'inductive (no test / external calls)' if g.get('inductive') else 'transductive'}.\n",
+               "Topology features: " + ", ".join(f"`{f}`" for f in g.get("topology_features", [])) + "\n",
+               md_table(pd.DataFrame([{k: v for k, v in r.items() if k != "input_dims"} for r in g.get("variants", [])]))]
     p = res / "clustering.json"
     if p.exists():
         c = load_json(p)

@@ -12,6 +12,10 @@ from scamkg.utils import dumps, get_logger, read_jsonl, slugify
 
 log = get_logger(__name__)
 CATEGORIES = {"fraudster", "salesperson", "prankster", "other_legitimate"}
+# CHANGE: an unusable answer (request failed / no JSON) used to get scam_probability 0.5, and the 0.5
+# threshold (score >= 0.5) then counted it as a scam detection, inflating zero-shot recall. It now gets
+# 0.0 = "no alert", the honest outcome for a detector that did not answer; valid_rate is reported.
+NO_ANSWER_SCORE = 0.0
 
 
 def classify(client, text: str, max_chars: int = 6000) -> dict:
@@ -19,18 +23,25 @@ def classify(client, text: str, max_chars: int = 6000) -> dict:
     try:
         raw = client.chat(build_classification_messages(truncate_transcript(text, max_chars)))
     except LLMError as e:
-        return {"valid": False, "error": str(e), "scam_probability": 0.5, "category": "", "label": ""}
+        return {"valid": False, "error": str(e), "scam_probability": NO_ANSWER_SCORE, "category": "", "label": ""}
     obj = parse_json_response(raw)
     if not isinstance(obj, dict):
-        return {"valid": False, "raw": (raw or "")[:500], "scam_probability": 0.5, "category": "", "label": ""}
+        return {"valid": False, "raw": (raw or "")[:500], "scam_probability": NO_ANSWER_SCORE, "category": "",
+                "label": ""}
     label = str(obj.get("label", "")).strip().lower()
+    default = 1.0 if label in ("scam", "fraud") else 0.0 if label == "legitimate" else NO_ANSWER_SCORE
     try:
-        p = float(obj.get("scam_probability", obj.get("confidence", 0.5)))
+        p = float(obj.get("scam_probability", obj.get("confidence", default)))
     except (TypeError, ValueError):
-        p = 0.5
+        p = default
     p = min(1.0, max(0.0, p))
-    if label in ("scam", "fraud") and p < 0.5 and "scam_probability" not in obj:
-        p = 1 - p   # a confidence in the stated label, not a scam probability
+    if "scam_probability" not in obj and "confidence" in obj:
+        # a confidence in the stated label, not a scam probability. CHANGE: before, only "scam" answers
+        # were converted, so "legitimate" with confidence 0.9 was scored as a 0.9 scam probability.
+        if label in ("scam", "fraud"):
+            p = max(p, 1 - p)
+        elif label == "legitimate":
+            p = 1 - max(p, 1 - p)
     cat = str(obj.get("category", "")).strip().lower()
     return {"valid": label in ("scam", "legitimate"), "label": label, "scam_probability": p,
             "category": cat if cat in CATEGORIES else "", "reason": str(obj.get("reason", ""))[:300]}
@@ -39,7 +50,8 @@ def classify(client, text: str, max_chars: int = 6000) -> dict:
 def _run(ctx, ids: list[str], out_path, model, provider) -> dict[str, dict]:
     llm = ctx.cfg["llm"]
     client = make_client(ctx.cfg, cache_dir=ctx.paths.cache, model=model, provider=provider)
-    done = {r["call_id"]: r for r in read_jsonl(out_path)}
+    # CHANGE: answers that failed with a request error (timeout, server down) are asked again on resume
+    done = {r["call_id"]: r for r in read_jsonl(out_path) if not r.get("error")}
     todo = [c for c in ids if c not in done]
     with open(out_path, "a", encoding="utf-8") as f:
         for cid in tqdm(todo, desc=f"llm[{client.model}]", disable=len(todo) < 10):

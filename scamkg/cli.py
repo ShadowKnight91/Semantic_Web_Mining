@@ -62,6 +62,8 @@ def cmd_extract(args, cfg):
         calls = calls[calls["split"].isin(args.splits)]
     models = args.model or [None]
     versions = args.prompt_version or [None]
+    if getattr(args, "no_fallback", False):
+        cfg = {**cfg, "llm": {**cfg["llm"], "fallback_model": None}}
     for model in (models if args.extractor == "llm" else [None]):
         for version in (versions if args.extractor == "llm" else [None]):
             ex = make_extractor(args.extractor, cfg, ctx.ontology, cache_dir=ctx.paths.cache, model=model,
@@ -286,7 +288,7 @@ def cmd_run_all(args, cfg):
         cmd_download(args, cfg)
     cmd_preprocess(args, cfg)
     cmd_extract(ns(extractor=args.extractor, datasets=None, splits=None, model=args.model, prompt_version=None,
-                   provider=None, run_name=None, no_resume=False, workers=None, limit=None), cfg)
+                   provider=None, run_name=None, no_resume=False, workers=None, limit=None, no_fallback=False), cfg)
     cmd_build_graph(ns(run=None, backend="neo4j" if args.with_neo4j else None, no_rdf=False), cfg)
     cmd_eda(ns(run=None), cfg)
     cmd_annotate_sample(ns(n=50, from_synthetic=demo), cfg)
@@ -339,6 +341,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--workers", type=int, default=None)
     s.add_argument("--run-name", default=None)
     s.add_argument("--no-resume", action="store_true")
+    s.add_argument("--no-fallback", action="store_true",
+                   help="disable llm.fallback_model (use for the model / prompt comparisons of RQ2)")
     s.set_defaults(fn=cmd_extract)
 
     s = sub.add_parser("annotate-sample", help="sample calls + templates for the 2-annotator gold standard")

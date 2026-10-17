@@ -110,10 +110,17 @@ def preprocess(cfg: dict, paths: Paths) -> pd.DataFrame:
     log.info("Dropped %d calls shorter than %s words", before - len(df), dcfg.get("min_words", 5))
 
     key = df["text_plain"].str.lower().str.replace(r"[^a-z0-9]", "", regex=True)
-    conflicts = df.assign(_k=key).groupby("_k")["label"].nunique()
-    n_conflict = int((conflicts > 1).sum())
+    labeled = df["label"] >= 0
+    conflicts = df[labeled].assign(_k=key[labeled]).groupby("_k")["label"].nunique()
+    bad_keys = set(conflicts[conflicts > 1].index)
+    n_conflict = len(bad_keys)
+    # CHANGE: a transcript that appears with both labels is dropped entirely. Before, the first copy was
+    # kept with whichever label it happened to have, i.e. a coin-flip label in train or test.
+    conflict_rows = key.isin(bad_keys)
+    df, key = df[~conflict_rows.to_numpy()], key[~conflict_rows]
     dup = key.duplicated(keep="first")
-    log.info("Removed %d duplicate transcripts (%d with conflicting labels)", int(dup.sum()), n_conflict)
+    log.info("Removed %d duplicate transcripts and %d transcripts with conflicting labels (%d rows)",
+             int(dup.sum()), n_conflict, int(conflict_rows.sum()))
     df = df[~dup.to_numpy()].reset_index(drop=True)
 
     df["call_id"] = [f"{ds}_{i:05d}" for ds, i in zip(df["dataset"], df.groupby("dataset").cumcount())]

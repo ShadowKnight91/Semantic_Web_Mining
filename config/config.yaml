@@ -30,7 +30,8 @@ data:
       hf_name: BothBosu/scam-dialogue
       local_dir: data/raw/bothbosu
     kaggle:
-      slug: null                   # "<owner>/<dataset>" to download with the Kaggle CLI
+      # CHANGE: the proposal now cites this data set as reference [18]
+      slug: teeconnie/scam-and-non-scam-call-conversation-dataset
       local_dir: data/raw/kaggle
       text_col: null               # null = auto-detect
       label_col: null
@@ -50,13 +51,16 @@ ontology:
   shapes: ontology/shapes.ttl
 
 llm:
-  provider: ollama                 # ollama | voyager (any OpenAI-compatible endpoint)
-  model: qwen2.5:7b
-  compare_models: [qwen2.5:7b, gemma2:9b]
+  provider: voyager                # ollama | voyager (any OpenAI-compatible endpoint)
+  model: gemma4-31b-it
+  compare_models: [gemma4-31b-it, qwen3-30b-a3b]
   prompt_version: v1_full          # v1_full | v2_no_descriptors | v3_no_example | v0_open
   temperature: 0.1
   seed: 42
-  max_retries: 2
+  max_retries: 2                   # retries per model, each with feedback for the specific failure
+  schema_retry: true               # also retry when the JSON parses but no triple fits the ontology
+  fallback_model: qwen3-30b-a3b    # second model tried when the primary gives nothing usable (null = off)
+  fallback_provider: null          # null = same provider as the primary model
   grounding: true                  # drop triples whose evidence/mention is not in the transcript
   max_chars: 6000
   max_tokens: 2048                 # output cap (Ollama num_predict / OpenAI max_tokens)
@@ -85,6 +89,8 @@ graph:
   knn_k: 10
   sim_topk: 5
   smoothing: 2.0                   # Bayesian smoothing for leak-safe label rates
+  label_encoding: oof              # oof (5-fold out-of-fold, default) | loo (leave-one-out, old behaviour)
+  label_encoding_folds: 5
   onehot_min_count: 2              # entity one-hot columns need >= this many calls
 
 neo4j:
@@ -118,19 +124,3 @@ models:
     seeds: [42]
   sbert:
     model_name: sentence-transformers/all-MiniLM-L6-v2
-    chunk_words: 180
-    mlp_hidden: [256]
-  graphsage:
-    hidden: 64
-    dropout: 0.3
-    lr: 0.01
-    weight_decay: 5.0e-4
-    epochs: 300
-    patience: 30
-    node_features: sbert           # sbert | tfidf_svd
-    use_similarity_edges: false
-  clustering:
-    k_min: 2
-    k_max: 12
-    pca_dim: 20
-    dbscan_min_samples: 5

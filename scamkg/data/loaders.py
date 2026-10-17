@@ -6,6 +6,7 @@ Column names are auto-detected; override them in config (data.sources.<name>.*_c
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import numpy as np
@@ -125,10 +126,37 @@ def load_bothbosu(cfg: dict, paths: Paths) -> pd.DataFrame | None:
                   df[sub_col] if sub_col else None)
 
 
+def _read_labeled_txt(directory: Path) -> pd.DataFrame | None:
+    """Plain-text layout of teeconnie/scam-and-non-scam-call-conversation-dataset: English_Scam.txt and
+    English_NonScam.txt, one call per paragraph (blank line between calls). The label comes from the
+    file name. CHANGE: the scam file numbers its calls ("12.<TAB>..."); the numbers are stripped,
+    otherwise a text model could detect scams just by the leading number."""
+    rows = []
+    for f in sorted(directory.glob("*.txt")) if directory.exists() else []:
+        name = f.stem.lower().replace("-", "").replace("_", "").replace(" ", "")
+        if "nonscam" in name or "notscam" in name or "legit" in name:
+            label = 0
+        elif "scam" in name or "fraud" in name:
+            label = 1
+        else:
+            continue
+        text = f.read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n")
+        for k, block in enumerate(re.split(r"\n\s*\n", text)):
+            block = re.sub(r"^\s*\d+\s*[.)]\s*", "", block.strip())
+            if block:
+                rows.append({"id": f"{f.stem}_{k}", "text": block, "label": label})
+    if rows:
+        log.info("Kaggle: read %d calls from text files in %s", len(rows), directory)
+    return pd.DataFrame(rows) if rows else None
+
+
 def load_kaggle(cfg: dict, paths: Paths) -> pd.DataFrame | None:
-    """Kaggle scam / non-scam call conversations; handles one-row-per-call and one-row-per-turn layouts."""
+    """Kaggle scam / non-scam call conversations; handles one-row-per-call and one-row-per-turn layouts,
+    and the English_Scam.txt / English_NonScam.txt layout of the data set cited in the proposal."""
     src = _src(cfg, "kaggle")
     df = _read_tables(_dir(paths, src, "kaggle"))
+    if df is None:
+        df = _read_labeled_txt(_dir(paths, src, "kaggle"))
     if df is None:
         log.warning("Kaggle data not found in data/raw/kaggle - see README (Data sets)")
         return None

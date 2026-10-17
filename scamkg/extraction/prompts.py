@@ -46,6 +46,23 @@ EXAMPLE_OUTPUT = {"triples": [
 RETRY_MESSAGE = ("Your previous answer was not a valid JSON object of the form {\"triples\": [...]}. "
                  "Return ONLY that JSON object, with no explanation and no markdown.")
 
+# CHANGE (TA comment 1): the retry used to send the same generic message whatever went wrong. The model now
+# gets feedback for the specific failure, which fixes most errors on the first retry.
+RETRY_WRAPPER_MESSAGE = ("Your previous answer was JSON but not an object with a \"triples\" list "
+                         "(for example a bare list or a different key). Return ONLY {\"triples\": [...]}.")
+
+
+def schema_retry_message(ontology: Ontology, problems: list[str]) -> str:
+    """Feedback when the JSON parsed but none of its triples fit the ontology (unknown relations,
+    wrong object types, values outside the allowed list, or missing fields)."""
+    rels = ", ".join(f"{r.name} -> {r.target}" for r in ontology.relations.values())
+    shown = "; ".join(problems[:5])
+    return ("Your previous answer was valid JSON, but none of its triples fit the ontology "
+            f"({shown}). Each triple needs the fields relation, object_type and object. "
+            f"Use ONLY these relations (relation -> object_type): {rels}. "
+            "For closed types use exactly one allowed value. If the caller states no such fact, return "
+            "{\"triples\": []}. Return ONLY the JSON object.")
+
 _RULES = """RULES
 1. Extract facts about what the CALLER says or does, not the receiver.
 2. Use ONLY the relations and entity types defined above. Every triple has the call as its subject, so give only the relation and the object.
