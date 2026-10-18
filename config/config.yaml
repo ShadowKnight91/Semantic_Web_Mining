@@ -78,7 +78,7 @@ llm:
       api_key_env: VOYAGER_API_KEY
 
 extraction:
-  default_run: null                # extraction run used for the KG; null = most recent run
+  default_run: llm_voyager_gemma4-31b-it_v1_full_fb-qwen3-30b-a3b                # extraction run used for the KG; null = most recent run
 
 graph:
   backend: networkx                # networkx | neo4j (Neo4j Graph Data Science)
