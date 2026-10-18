@@ -39,8 +39,8 @@ calls. Before, test and external calls were inside the training graph, which mak
 
 Training: 2 SAGE layers, mean aggregation, 64 hidden units, dropout 0.3, Adam, class-weighted BCE,
 early stopping on validation PR-AUC. Used (a) end-to-end ("graphsage") and (b) as an embedding
-generator for XGBoost ("graphsage_xgb"). PyTorch Geometric's SAGEConv is used when installed,
-otherwise an equivalent pure-PyTorch layer.
+generator for XGBoost ("graphsage_xgb", run_graphsage_xgb in a separate, torch-free step). PyTorch
+Geometric's SAGEConv is used when installed, otherwise an equivalent pure-PyTorch layer.
 """
 from __future__ import annotations
 
@@ -324,18 +324,31 @@ def run_graphsage(ctx) -> None:
                     extra={"val_pr_auc": res["best_ap"], "epochs": res["epochs"], "blocks": variant})
         rows.append({"variant": variant, "model": name, "val_pr_auc": res["best_ap"], "epochs": res["epochs"],
                      "input_dims": res["dims"]})
-        if k > 0:
-            continue
-        # main variant: GraphSAGE as an embedding generator for XGBoost, plus saved artefacts
-        fit_ids = ctx.train_ids + ctx.val_ids
-        yfit = ctx.labels(fit_ids)
-        emb = res["emb"]
-        xgb = make_model("xgb", {}, ctx.seed, yfit).fit(emb[[idx[c] for c in fit_ids]], yfit)
-        ev.evaluate("E4", "graphsage_xgb", pd.Series(xgb.predict_proba(emb[[idx[c] for c in eval_ids]])[:, 1],
-                                                     index=eval_ids))
-        np.savez_compressed(ctx.paths.models / "graphsage_call_embeddings.npz", ids=np.array(ctx.kg.call_ids),
-                            emb=emb)
-        torch.save(res["state"], ctx.paths.models / "graphsage.pt")
+        if k == 0:   # main variant: its embeddings feed graphsage_xgb (run_graphsage_xgb)
+            np.savez_compressed(embeddings_path(ctx), ids=np.array(ctx.kg.call_ids), emb=res["emb"])
+            torch.save(res["state"], ctx.paths.models / "graphsage.pt")
     save_json(ctx.paths.results / "graphsage_fusion.json",
               {"topology_features": topo_names, "fusion": gcfg.get("fusion"), "inductive": gcfg.get("inductive", True),
                "variants": rows})
+
+
+def embeddings_path(ctx):
+    return ctx.paths.models / "graphsage_call_embeddings.npz"
+
+
+def run_graphsage_xgb(ctx) -> None:
+    """GraphSAGE as an embedding generator for XGBoost. Kept apart from run_graphsage (and free of
+    torch) because PyTorch and XGBoost cannot share a process on macOS (clashing OpenMP runtimes)."""
+    path = embeddings_path(ctx)
+    if not path.exists():
+        log.warning("No GraphSAGE embeddings (%s) - run E4 first", path.name)
+        return
+    z = np.load(path, allow_pickle=False)
+    emb = dict(zip(z["ids"].tolist(), z["emb"]))
+    ev = Evaluator(ctx)
+    eval_ids = ev.eval_ids()
+    fit_ids = ctx.train_ids + ctx.val_ids
+    yfit = ctx.labels(fit_ids)
+    xgb = make_model("xgb", {}, ctx.seed, yfit).fit(np.stack([emb[c] for c in fit_ids]), yfit)
+    ev.evaluate("E4", "graphsage_xgb", pd.Series(xgb.predict_proba(np.stack([emb[c] for c in eval_ids]))[:, 1],
+                                                 index=eval_ids))

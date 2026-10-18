@@ -42,15 +42,20 @@ flowchart LR
 | X2 cross-dataset (train BothBosu, test Kaggle + NCSU) | automatic in every `train` | `scamkg/evaluation/evaluator.py` |
 | Realistic ~5% scam test split | automatic (`test_imbalanced`, mean +- std over 20 draws) | `scamkg/evaluation/evaluator.py` |
 | 5-fold stratified CV, McNemar test | `cv`, `significance` | `scamkg/models/classical.py`, `scamkg/evaluation/stats.py` |
+| Generalization to unseen scam scripts / legitimate call types (leave-one-type-out) | `loto` | `scamkg/models/classical.py` |
 | Ablations: each entity type, each feature group | `ablate` | `scamkg/evaluation/ablation.py` |
 | Explainability: identity-tactic-asset path per flagged call | `explain`, `predict`, dashboard | `scamkg/evaluation/explain.py`, `scamkg/predict.py` |
-| Stretch: fraudster / salesperson / prankster via LLM relabeling | `relabel`, `multiclass` | `scamkg/models/llm_zeroshot.py` |
+| Stretch: fraudster / salesperson / prankster (BothBosu types give gold labels; LLM relabeling for other data) | `multiclass`, `relabel` | `scamkg/data/loaders.py`, `scamkg/models/llm_zeroshot.py` |
 | Optional BankSim reference baseline | `banksim` | `scamkg/models/banksim.py` |
 | Deliverables: ontology, KG, Neo4j dump, models, dashboard, report | `build-graph`, `report`, `dashboard` | `results/`, `data/kg/`, `artifacts/` |
 
 ## Setup
 
-Python 3.11+ (tested with 3.14 on Windows).
+Python 3.11+ (tested with 3.14 on Windows and 3.12 on macOS / Apple Silicon).
+
+macOS: XGBoost needs the OpenMP runtime - `brew install libomp`. PyTorch ships its own, incompatible OpenMP
+runtime, so the torch parts of E3/E4 run in a separate worker process (XGBoost segfaults or deadlocks once both
+have run in one process).
 
 ```bash
 python -m venv .venv
@@ -90,9 +95,12 @@ Outputs go to `data/demo/`, `results/demo/` (see `results/demo/REPORT.md`) and `
 
 ## Running on the real data
 
-1. **Data** (Table I). BothBosu and NCSU download automatically. For Kaggle, either set
-   `data.sources.kaggle.slug` in `config/config.yaml` (Kaggle CLI is used) or put the CSV into
-   `data/raw/kaggle/`; column names are auto-detected (override with `text_col`, `label_col`, `id_col`).
+1. **Data** (Table I). BothBosu and NCSU download automatically. The Kaggle set
+   (`teeconnie/scam-and-non-scam-call-conversation-dataset`, 400 scam + 400 non-scam calls) downloads with the
+   Kaggle CLI when it is configured (`~/.kaggle/kaggle.json`); otherwise put its `English_Scam.txt` /
+   `English_NonScam.txt` into `data/raw/kaggle/`. CSV / JSON tables work too (columns are auto-detected; override
+   with `text_col`, `label_col`, `id_col`). Its license (CC BY-NC-ND) forbids redistributing modified copies, so
+   keep it out of git (`data/` is ignored).
 
    ```bash
    .venv\Scripts\python -m scamkg download
@@ -107,7 +115,8 @@ Outputs go to `data/demo/`, `results/demo/` (see `results/demo/REPORT.md`) and `
    ```
 
 2. **LLM setup.** Pull the two open-source models (or point `llm.provider: voyager` at ASU Voyager's
-   OpenAI-compatible endpoint via `VOYAGER_BASE_URL` / `VOYAGER_API_KEY`). Pilot on 20 calls first:
+   OpenAI-compatible endpoint via `VOYAGER_BASE_URL` / `VOYAGER_API_KEY`). Pilot on 20 calls first (`--limit`
+   draws a seeded random sample, so the pilot is not 20 calls of one scam type):
 
    ```bash
    ollama pull qwen2.5:7b
@@ -124,8 +133,10 @@ Outputs go to `data/demo/`, `results/demo/` (see `results/demo/REPORT.md`) and `
 3. **Full extraction**, comparing two LLMs, a prompt ablation, and the rule-based baseline. Runs resume
    after interruption (calls that failed are retried), every response is cached in `data/cache/llm/`,
    and each run records model, prompt version + hash, seed, temperature and fallback statistics in
-   `<run>.meta.json`. The main run uses the fallback model (`llm.fallback_model`, run name ends in
-   `_fb-gemma2-9b`); the comparison runs use `--no-fallback` so each run measures one model only.
+   `<run>.meta.json`. The main run uses the fallback model (`llm.fallback_model`; the run name ends in
+   `_fb-<fallback model>`); the comparison runs use `--no-fallback` so each run measures one model only.
+   The prompt ablation only needs the annotated calls (X1 scores them), so `--ids-file` limits it to
+   the 50-call annotation sample instead of extracting every call once per prompt variant.
 
    ```bash
    .venv\Scripts\python -m scamkg extract --extractor llm --model qwen2.5:7b
@@ -136,7 +147,7 @@ Outputs go to `data/demo/`, `results/demo/` (see `results/demo/REPORT.md`) and `
    ```
 
    ```bash
-   .venv\Scripts\python -m scamkg extract --extractor llm --model qwen2.5:7b --prompt-version v2_no_descriptors v3_no_example v0_open --splits test --no-fallback
+   .venv\Scripts\python -m scamkg extract --extractor llm --model qwen2.5:7b --prompt-version v2_no_descriptors v3_no_example v0_open --ids-file data/annotations/sample.jsonl --no-fallback
    ```
 
    ```bash
@@ -156,10 +167,12 @@ Outputs go to `data/demo/`, `results/demo/` (see `results/demo/REPORT.md`) and `
    ```
 
 5. **Knowledge graph.** The run used is `extraction.default_run` in the config, else the most recent run
-   with full coverage (pilot runs are never picked silently), or pass `--run <name>`.
+   with full coverage (pilot runs are never picked silently), or pass `--run <name>`. The default is the
+   committed Gemma run (`data/kg/extractions/llm_voyager_gemma4-31b-it_v1_full_fb-qwen3-30b-a3b.jsonl`, all
+   3,104 calls), so the graph can be built without calling an LLM; `--run rule` uses the rule-based baseline.
 
    ```bash
-   .venv\Scripts\python -m scamkg build-graph --run llm_ollama_qwen2.5-7b_v1_full_fb-gemma2-9b
+   .venv\Scripts\python -m scamkg build-graph
    ```
 
    With Neo4j + Graph Data Science instead of networkx (see below):
@@ -176,6 +189,10 @@ Outputs go to `data/demo/`, `results/demo/` (see `results/demo/REPORT.md`) and `
 
    ```bash
    .venv\Scripts\python -m scamkg cv
+   ```
+
+   ```bash
+   .venv\Scripts\python -m scamkg loto
    ```
 
    ```bash
@@ -270,18 +287,21 @@ docker compose up -d neo4j
 Neo4j Browser is at http://localhost:7474 (user `neo4j`, password from `.env`). `build-graph --backend neo4j`
 loads `(:Call)-[:CLAIMS_TO_BE|MENTIONS_ORG|USES_TACTIC|REQUESTS|PAY_VIA|PROVIDES_NUMBER]->(entity)`,
 writes `SIMILAR_TO` edges with `gds.nodeSimilarity` and `community` with `gds.louvain`, and streams
-degree / PageRank / betweenness back into the pipeline. Example queries: `neo4j/queries.cypher`.
+degree / PageRank / betweenness back into the pipeline. Later commands (`train`, `loto`, ...) use the
+features of the most recent `build-graph` for that extraction run, so run `build-graph` again to switch back
+to networkx. Example queries: `neo4j/queries.cypher`.
 Database dump for the deliverable:
 
 ```bash
-docker compose stop neo4j
+docker compose stop -t 120 neo4j
 ```
 
 ```bash
-docker compose run --rm neo4j neo4j-admin database dump neo4j --to-path=/dumps
+docker compose run --rm neo4j neo4j-admin database dump neo4j --to-path=/dumps --overwrite-destination=true
 ```
 
-The dump lands in `neo4j/dumps/`. Without Docker, any Neo4j 5 server with the GDS plugin works.
+The dump lands in `neo4j/dumps/`. The `-t 120` gives Neo4j time to checkpoint after a large load; a hard stop
+leaves an active transaction log and the dump refuses to run (start and stop it again to recover). Without Docker, any Neo4j 5 server with the GDS plugin works.
 
 ## Semantic-web artefacts
 
@@ -301,6 +321,7 @@ The dump lands in `neo4j/dumps/`. Without Docker, any Neo4j 5 server with the GD
 | `results/metrics.csv` | every model x evaluation set (test, test_imbalanced, each external set) |
 | `results/predictions/*.csv` | per-call scores of every model |
 | `results/cv_results.csv`, `significance.csv`, `generalization.csv` | CV mean +- std, McNemar, recall drop |
+| `results/loto.csv`, `loto_summary.csv` | leave-one-type-out: recall on unseen scam types, false-positive rate on unseen legitimate types |
 | `results/extraction_quality.csv` | X1 per extraction run |
 | `results/clustering.json`, `scam_scripts.md` | E5 metrics and discovered scripts |
 | `results/ablation.csv` | entity-type and feature-group ablations |
@@ -313,16 +334,21 @@ The dump lands in `neo4j/dumps/`. Without Docker, any Neo4j 5 server with the GD
 * Graph structure (PageRank, degree, betweenness, Louvain, Jaccard) is label-free.
 * Every label-derived feature (community scam rate, similarity to known scams, k-NN scam rate, entity
   risk) is rebuilt for each training set from **training labels only** (train for tuning, train+val for
-  the final model, the fold's train part in CV), with 5-fold **out-of-fold** values for training calls
-  (`graph.label_encoding: oof`; leave-one-out made tree models learn a label artefact, see
-  `GraphFeatureBuilder.build`) (`tests/test_features.py`).
+  the final model, the fold's train part in CV). Training calls get **out-of-fold** values (5-fold
+  cross-fitting, `graph.label_folds`): leave-one-out alone leaks, because within a community the LOO
+  rate of every scam is lower than that of every legitimate call (`tests/test_features.py`).
+* Mixed external sets that draw from the primary data set use only its held-out test split.
+* Cached structural features are keyed by the content of the extraction run, so re-extracting under
+  the same run name never reuses stale graph features.
 * GraphSAGE trains inductively: the loss graph has no validation / test / external calls, early
   stopping uses train + validation calls, and only final scoring uses the full graph.
 * Hyper-parameters are tuned by randomized search on the validation split only.
 * LLM extraction: temperature 0.1, fixed seed, capped output length, JSON validation with retry, schema
   repair, entity standardization, and a grounding check that drops triples whose evidence/mention is not
   in the transcript (e.g. content copied from the few-shot example). Inferred facts are flagged.
-* Everything is seeded (`project.seed`); results rows record the extraction run used.
+* Everything is seeded (`project.seed`); results rows record the extraction run used. Call ids are numbered
+  per data set before cross-data-set de-duplication, so adding a data set never renames existing calls
+  (annotations, LLM runs and caches refer to them).
 
 ## Repository layout
 
@@ -360,12 +386,22 @@ tests/           pytest suite (runs offline on synthetic data)
 ## Notes
 
 * The NCSU robocall set contains only illegal robocalls (label 1), so only recall is defined on it alone;
-  the `ncsu+kaggle` evaluation set pairs its calls with Kaggle's legitimate calls for PR-AUC.
-* `data.sources.kaggle.slug` is set to `teeconnie/scam-and-non-scam-call-conversation-dataset`
-  (proposal reference [18]); the Kaggle CLI needs `~/.kaggle/kaggle.json`, otherwise put the CSV in
-  `data/raw/kaggle/`. Check the column names after the first `preprocess` and set `text_col` /
-  `label_col` if the auto-detection picks the wrong ones.
+  the `ncsu+kaggle` evaluation set pairs its calls with Kaggle's legitimate calls for PR-AUC. "Illegal
+  robocall" is not always fraud: some are aggressive telemarketing (warranties, interest rates).
+* Kaggle calls are caller-only monologues with template slots (`[Greetings]`, `[Company]`, `[Money]`...).
+  Cleaning removes the slots; this matters because `[Greetings]` opens every non-scam call but only 77% of
+  the scams, and `[Money]` / `[Link]` occur only in scams. One Kaggle scam is a verbatim NCSU robocall; the
+  duplicate is kept once (in Kaggle).
+* In-distribution BothBosu scores saturate (every model, even TF-IDF + LR, reaches PR-AUC 1.0, and so does
+  validation, so tuning cannot separate candidates). Use `loto` and the external sets to answer the RQs.
+* On shifted data, recall / precision / F1 at the 0.5 threshold mostly measure calibration: a model can rank
+  the Kaggle calls well (PR-AUC 0.89) and still flag almost none of them at 0.5. Compare models with PR-AUC,
+  ROC-AUC and `recall_at_fpr10` (recall when each model's threshold flags 10% of the set's legitimate calls).
+  McNemar tests use the 0.5 threshold and inherit the same caveat.
 * Zero-shot answers that fail (no JSON, request error) are scored 0.0 ("no alert") and counted in
   `valid_rate`; they used to be scored 0.5, which the 0.5 threshold counted as a scam detection.
 * Small local models (e.g. `qwen2.5:0.5b`) produce valid JSON but noisy, sometimes copied triples; use
   7B+ models (or Voyager) for the real extraction runs.
+* Throughput on an M1 Pro (16 GB): `qwen2.5:7b` about 15 s per call (roughly 9-10 h for all 2,312 calls),
+  `gemma2:9b` about 20 s. Ollama answers one request at a time unless it is started with
+  `OLLAMA_NUM_PARALLEL` > 1, so `--workers` only helps then. Runs resume, so they can span several sessions.

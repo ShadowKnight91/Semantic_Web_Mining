@@ -15,6 +15,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
@@ -145,6 +146,16 @@ def _as_bool(v) -> bool:
     return bool(v) if isinstance(v, (int, float)) else False
 
 
+def _expand_short_number(mention: str, evidence) -> str:
+    """LLMs often give an IVR option ("press 1") or an extension as the bare digit; recover it from the
+    evidence so it standardizes like the rule-based extractor's output (ivr:press-1, ext-42)."""
+    if mention.isdigit() and len(mention) <= 6:
+        m = re.search(rf"\b(press|extension|ext\.?)\s*{re.escape(mention)}\b", str(evidence or ""), re.IGNORECASE)
+        if m:
+            return f"{m.group(1)} {mention}"
+    return mention
+
+
 def _norm_relation(rel) -> str:
     return re.sub(r"[\s\-]+", "_", str(rel or "").strip()).upper()
 
@@ -188,6 +199,8 @@ def validate_triples(obj: Any, ontology: Ontology, standardizer: EntityStandardi
             stats["problems"].append("missing or non-text 'object' field")
             continue
         mention = str(mention).strip()
+        # the type the model itself assigned (stated, else implied by its relation) - for X1 type accuracy
+        raw_type = otype if otype in ontology.entity_types else ontology.target_of(rel)
         repaired = False
         conform = True
         if rel not in ontology.relations:
@@ -214,6 +227,8 @@ def validate_triples(obj: Any, ontology: Ontology, standardizer: EntityStandardi
                 rel = ontology.relation_for_target(target)
                 repaired = True
         if canon is None:
+            if target == "CallbackNumber":
+                mention = _expand_short_number(mention, t.get("evidence"))
             canon = standardizer.standardize(target, mention)
         if canon is None:
             alt = standardizer.infer_type(mention, exclude=target)
@@ -232,7 +247,8 @@ def validate_triples(obj: Any, ontology: Ontology, standardizer: EntityStandardi
         key = (rel, canon)
         triple = {"relation": rel, "object_type": target, "object": canon, "mention": mention[:200],
                   "detail": str(t.get("detail") or "")[:120], "evidence": str(t.get("evidence") or "")[:300],
-                  "inferred": _as_bool(t.get("inferred", False)), "repaired": repaired}
+                  "inferred": _as_bool(t.get("inferred", False)), "repaired": repaired,
+                  "raw_type": raw_type or target}
         if key in out:
             # keep the stated (non-inferred) version when the same fact appears twice
             if out[key]["inferred"] and not triple["inferred"]:
@@ -463,6 +479,7 @@ def summarize_records(records: list[dict]) -> dict:
     for t in triples:
         per_rel[t["relation"]] = per_rel.get(t["relation"], 0) + 1
     n_raw = sum(r.get("n_raw", 0) for r in records)
+    fresh = [r for r in records if not r.get("cached")]   # replays from the response cache take ~0 s
     return {
         "n_calls": n,
         "json_validity_rate": sum(bool(r.get("json_valid")) for r in records) / n,
@@ -476,8 +493,9 @@ def summarize_records(records: list[dict]) -> dict:
         "repaired_rate": (sum(r.get("n_repaired", 0) for r in records) / n_raw) if n_raw else 0.0,
         "ungrounded_rate": (sum(r.get("n_ungrounded", 0) for r in records) / n_raw) if n_raw else 0.0,
         "inferred_rate": (sum(bool(t.get("inferred")) for t in triples) / len(triples)) if triples else 0.0,
-        "mean_latency_s": sum(r.get("latency_s", 0.0) for r in records) / n,
-        # CHANGE (TA comment 1): how often each fallback layer was needed
+        "mean_latency_s": sum(r.get("latency_s", 0.0) for r in fresh) / len(fresh) if fresh else None,
+        "cached_rate": 1 - len(fresh) / n,
+        # how often each fallback layer was needed (TA comment 1)
         "retry_rate": sum(r.get("attempts", 1) > 1 for r in records) / n,
         "salvage_rate": sum(bool(r.get("salvaged")) for r in records) / n,
         "fallback_rate": sum(bool(r.get("fallback_used")) for r in records) / n,
@@ -488,8 +506,10 @@ def summarize_records(records: list[dict]) -> dict:
 
 
 def run_extraction(calls: pd.DataFrame, extractor: BaseExtractor, out_dir: Path, run_name: str | None = None,
-                   resume: bool = True, max_workers: int = 1, limit: int | None = None) -> Path:
-    """Extract triples for every call (column `text`) and append them to <out_dir>/<run>.jsonl."""
+                   resume: bool = True, max_workers: int = 1, limit: int | None = None, seed: int = 42) -> Path:
+    """Extract triples for every call (column `text`) and append them to <out_dir>/<run>.jsonl.
+    `limit` takes a seeded random sample of the pending calls (a pilot run): the data files are often
+    sorted by type, so the first N calls would all come from one scam script."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     run_name = slugify(run_name or extractor.run_name)
@@ -510,8 +530,9 @@ def run_extraction(calls: pd.DataFrame, extractor: BaseExtractor, out_dir: Path,
     # Before, any written record counted as done, so one Ollama timeout lost that call for good.
     done = {r["call_id"] for r in latest_records(read_jsonl(out_path)) if not _is_failed(r)} if resume else set()
     todo = [(cid, text) for cid, text in calls["text"].items() if cid not in done]
-    if limit is not None:
-        todo = todo[:limit]
+    if limit is not None and limit < len(todo):
+        pick = np.sort(np.random.default_rng(seed).choice(len(todo), size=limit, replace=False))
+        todo = [todo[i] for i in pick]
     log.info("Extraction run %s: %d calls to process (%d already done)", run_name, len(todo), len(done))
     lock = threading.Lock()
     with out_path.open("a", encoding="utf-8") as f:

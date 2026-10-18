@@ -12,15 +12,17 @@ from scamkg.extraction.extractor import make_extractor
 from scamkg.graph.build import CallKG
 from scamkg.graph.features import GraphFeatureBuilder
 from scamkg.models.classical import EXPERIMENT_SPECS
-from scamkg.utils import get_logger
+from scamkg.utils import get_logger, load_json
 
 log = get_logger(__name__)
 NEW_ID = "__new_call__"
 
 
 class ScamDetector:
-    def __init__(self, cfg: dict, experiment: str = "E2", model: str = "xgb", extractor: str = "rule",
+    def __init__(self, cfg: dict, experiment: str = "E2", model: str = "xgb", extractor: str | None = None,
                  run: str | None = None, llm_model: str | None = None):
+        """`extractor=None` uses the extractor (and LLM settings) that built the KG, so the new call's
+        triples and graph features are comparable with the ones the model was trained on."""
         self.cfg = cfg
         if experiment not in EXPERIMENT_SPECS:
             raise ValueError(f"ScamDetector supports {sorted(EXPERIMENT_SPECS)}")
@@ -29,8 +31,18 @@ class ScamDetector:
         if not path.exists():
             raise FileNotFoundError(f"{path} not found - run `python -m scamkg train` first")
         self.bundle = joblib.load(path)
+        meta_path = self.ctx.paths.extractions / f"{self.ctx.run_name}.meta.json"
+        meta = load_json(meta_path) if meta_path.exists() else {}
+        kg_extractor = meta.get("extractor", "rule")
+        extractor = extractor or kg_extractor
+        if extractor != kg_extractor:
+            log.warning("The KG (run %s) was built with the %s extractor but new calls use %s: their triples and "
+                        "graph features are not comparable", self.ctx.run_name, kg_extractor, extractor)
+        same_llm = extractor == "llm" and kg_extractor == "llm"
         self.extractor = make_extractor(extractor, cfg, self.ctx.ontology, cache_dir=self.ctx.paths.cache,
-                                        model=llm_model)
+                                        model=llm_model or (meta.get("model") if same_llm else None),
+                                        provider=meta.get("provider") if same_llm else None,
+                                        prompt_version=meta.get("prompt_version") if same_llm else None)
         self.labeled_ids = [c for c in self.bundle["labeled_ids"] if c in self.ctx.calls.index]
 
     def score(self, transcript: str) -> dict:

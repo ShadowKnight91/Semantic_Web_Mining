@@ -148,8 +148,12 @@ class Neo4jStore:
         df["het_degree"] = [deg.get(c, 0.0) for c in kg.call_ids]
         # GDS PageRank is un-normalized (mean ~1 per node), matching networkx's pagerank * n_nodes
         df["het_pagerank"] = [pr.get(c, 0.0) for c in kg.call_ids]
-        # networkx reports normalized betweenness; GDS reports raw pair counts
+        # networkx reports normalized betweenness, extrapolated by n/k when it samples k sources;
+        # GDS reports raw pair counts from the sampled sources only
         norm = max(1.0, (n_nodes - 1) * (n_nodes - 2) / 2)
+        samples = int(gcfg.get("betweenness_samples", 300))
+        if 0 < samples < n_nodes:
+            norm *= samples / n_nodes
         df["het_betweenness"] = [bc.get(c, 0.0) / norm for c in kg.call_ids]
         df["cc_degree"] = [cc_deg.get(c, 0.0) for c in kg.call_ids]
         df["cc_weighted_degree"] = [cc_wdeg.get(c, 0.0) for c in kg.call_ids]

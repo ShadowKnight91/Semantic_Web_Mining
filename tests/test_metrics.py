@@ -56,3 +56,12 @@ def test_zeroshot_answer_parsing():
     assert classify(C('{"label": "scam", "confidence": 0.3}'), "x")["scam_probability"] == pytest.approx(0.7)
     bad = classify(C("I cannot answer that"), "x")
     assert not bad["valid"] and bad["scam_probability"] == NO_ANSWER_SCORE < 0.5
+
+
+def test_recall_at_fixed_fpr_ignores_calibration():
+    y = np.array([0] * 10 + [1] * 10)
+    s = np.r_[np.linspace(0.00, 0.09, 10), np.linspace(0.10, 0.19, 10)]   # all scores far below 0.5
+    m = binary_metrics(y, s)
+    assert m["recall"] == 0.0                     # nothing passes the 0.5 threshold ...
+    assert m["recall_at_fpr10"] == 1.0            # ... but at a 10% false-alarm rate every scam is caught
+    assert np.isnan(binary_metrics([1, 1], [0.2, 0.9])["recall_at_fpr10"])

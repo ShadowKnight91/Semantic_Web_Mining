@@ -1,50 +1,50 @@
-{"call_id": "bothbosu_00063", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00065", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00066", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00067", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00244", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00286", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00327", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00346", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00360", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00377", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00395", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00456", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00490", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00526", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00529", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00533", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00610", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00621", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00622", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00635", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00703", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00705", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00706", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00707", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00884", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00926", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00967", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_00986", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01000", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01017", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01035", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01096", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01130", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01166", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01169", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01173", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01250", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01261", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01262", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01275", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01296", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01305", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01334", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01359", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01389", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01456", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01465", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01494", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01519", "annotator": "B", "triples": []}
-{"call_id": "bothbosu_01549", "annotator": "B", "triples": []}
+{"call_id": "bothbosu_00063", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00065", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00066", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00067", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00244", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00286", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00327", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00346", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00360", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00377", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00395", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00456", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00490", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00526", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00529", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00533", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00610", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00621", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00622", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00635", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00703", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00705", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00706", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00707", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00884", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00926", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00967", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_00986", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01000", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01017", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01035", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01096", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01130", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01166", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01169", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01173", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01250", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01261", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01262", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01275", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01296", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01305", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01334", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01359", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01389", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01456", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01465", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01494", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01519", "annotator": "B", "done": false, "triples": []}
+{"call_id": "bothbosu_01549", "annotator": "B", "done": false, "triples": []}

@@ -5,9 +5,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-torch = pytest.importorskip("torch")
+from scamkg.models import gnn
+from scamkg.utils import has_module
 
-from scamkg.models import gnn  # noqa: E402
+# torch is never imported into the test process itself: on macOS, PyTorch's OpenMP runtime next to the one
+# scikit-learn / XGBoost load makes later tests segfault. GraphSAGE runs in a spawned process (as in `train`).
+pytestmark = pytest.mark.skipif(not has_module("torch"), reason="torch not installed")
 
 
 def _ctx(demo_ctx, **overrides):
@@ -40,15 +43,27 @@ def test_inductive_training_graph_has_no_test_calls(demo_ctx):
     assert calls_in <= set(tr) and sub.shape[1] < ei.shape[1]
 
 
+def _graphsage_child(cfg: dict, run: str, use_pyg: bool) -> None:
+    from scamkg.context import Context
+    if not use_pyg:
+        real = gnn.has_module
+        gnn.has_module = lambda m: False if m == "torch_geometric" else real(m)
+    gnn.run_graphsage(Context.load(cfg, run=run))
+
+
 @pytest.mark.parametrize("use_pyg", [False, True])
-def test_fusion_graphsage_runs_and_writes_variants(demo_ctx, monkeypatch, use_pyg):
+def test_fusion_graphsage_runs_and_writes_variants(demo_ctx, use_pyg):
     if use_pyg:
         pytest.importorskip("torch_geometric")
-    else:
-        real = gnn.has_module
-        monkeypatch.setattr(gnn, "has_module", lambda m: False if m == "torch_geometric" else real(m))
     ctx = _ctx(demo_ctx)
-    gnn.run_graphsage(ctx)
+    # torch runs in a fresh process, as in `train`: on macOS XGBoost (graphsage_xgb here, and every later
+    # test) crashes once PyTorch has run in the same process
+    import multiprocessing
+    p = multiprocessing.get_context("spawn").Process(target=_graphsage_child, args=(ctx.cfg, ctx.run_name, use_pyg))
+    p.start()
+    p.join()
+    assert p.exitcode == 0
+    gnn.run_graphsage_xgb(ctx)
     m = pd.read_csv(ctx.paths.results / "metrics.csv")
     test = m[(m["experiment"] == "E4") & (m["eval_set"] == "test")].set_index("model")
     for name in ("graphsage", "graphsage_text", "graphsage_topo", "graphsage_xgb"):

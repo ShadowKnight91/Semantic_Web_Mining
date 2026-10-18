@@ -16,7 +16,7 @@ Tests: 30 -> 42 (`python -m pytest`); all pass. The offline demo (`run-all`) run
 | `extractor.py`, `config.yaml` | `llm.fallback_model` (default `gemma2:9b`) runs when the primary model gives nothing usable or the request fails; `--no-fallback` for the model / prompt comparisons | the TA asked for a fallback; comparisons must still measure one model each |
 | `extractor.py` | per-call `status`, `attempts`, `retry_reasons`, `salvaged`, `fallback_used`, `model_used`; run-level `retry_rate`, `salvage_rate`, `fallback_rate`, `failed_rate` (also in `extraction_quality.csv`) | makes the fallback logic measurable for the report |
 | `extractor.py` | `run_extraction` retries calls whose last record failed when the run is resumed, and keeps one record per call | before, one Ollama timeout lost that call for good, and resumed runs double-counted calls |
-| `extractor.py` | a fallback run gets its own name (`..._fb-gemma2-9b`) | so it never mixes with a single-model comparison run |
+| `extractor.py` | a fallback run gets its own name (`..._fb-<fallback model>`) | so it never mixes with a single-model comparison run |
 | `cli.py` | `run-all` passes `no_fallback` to `extract` | the new flag would otherwise crash `run-all` |
 
 ## TA comment 2 - combining text representations with topological features before GraphSAGE
@@ -34,7 +34,7 @@ Tests: 30 -> 42 (`python -m pytest`); all pass. The offline demo (`run-all`) run
 
 | File | Change | Reason |
 |---|---|---|
-| `scamkg/graph/features.py` | label-based features (community scam rate, entity risk, ...) for **training** calls use 5-fold out-of-fold values instead of leave-one-out (`graph.label_encoding: oof`) | with leave-one-out, scams get a slightly lower value than legitimate calls in the same community; tree models learn that and it reverses on test data. Simulation (1,200 calls, 60 communities, 20 seeds): XGBoost test PR-AUC 0.587 (LOO) vs 0.659 (OOF); logistic regression 0.699 both |
+| `scamkg/graph/features.py` | label-based features (community scam rate, entity risk, ...) for **training** calls use 5-fold out-of-fold values instead of leave-one-out (`graph.label_folds: 5`) | with leave-one-out, scams get a slightly lower value than legitimate calls in the same community; tree models learn that and it reverses on test data. Simulation (1,200 calls, 60 communities, 20 seeds): XGBoost test PR-AUC 0.587 (LOO) vs 0.659 (OOF); logistic regression 0.699 both |
 | `scamkg/extraction/evaluate.py` | X1 keeps calls annotated as having **no** facts (`"annotated": true`) | they were dropped, so false-positive triples on fact-free calls were never counted and triple precision was inflated |
 | `scamkg/models/llm_zeroshot.py` | a failed answer scores 0.0 ("no alert") instead of 0.5; "legitimate, confidence 0.9" becomes scam probability 0.1; failed requests are retried on resume | 0.5 was counted as a scam detection by the >= 0.5 threshold (inflated recall); the confidence of a "legitimate" answer was read as a scam probability |
 | `scamkg/data/preprocess.py` | a transcript that appears with both labels is dropped | the first copy used to be kept with an arbitrary label |
@@ -50,3 +50,19 @@ Tests: 30 -> 42 (`python -m pytest`); all pass. The offline demo (`run-all`) run
   test environment; GraphSAGE was tested with the TF-IDF + SVD text block.
 * Real BothBosu / Kaggle data (download blocked in the test environment). The NCSU loader was checked on
   the real `metadata.csv` (1,378 English robocalls).
+
+## Merged with the `review-fixes` work (Neo4j / LLM verification, Kaggle, X1 gold)
+
+Both branches fixed some of the same things independently; where they overlapped, one version was kept:
+
+| Topic | Kept | Note |
+|---|---|---|
+| Call ids | stable per-data-set ids (`preprocess.py`) | adding a data set no longer shifts another one's ids. The committed Gemma run was re-keyed to these ids by transcript text (562 NCSU ids moved by one; every call matched exactly once, 99.3% of its evidence quotes are found in the matching transcript) |
+| Conflicting labels | dropped (this branch) | applied after the ids are assigned, so it cannot shift them either |
+| Out-of-fold label features | one implementation, `graph.label_folds: 5` (replaces `label_encoding` / `label_encoding_folds`) | plain `KFold`, so a call's own label never decides its fold |
+| Kaggle `.txt` loader | the `review-fixes` reader (English files only) + the `legit` / `fraud` file-name rules from this branch | |
+| Annotation flag | `"done": true` (used by the committed `annotator_A.jsonl`); `"annotated": true` is accepted too | fact-free annotated calls count in X1, as in this branch |
+| GraphSAGE | the fusion model of this branch; `graphsage_xgb` runs as a separate, torch-free step | PyTorch and XGBoost crash in one process on macOS; `train` runs E3 / E4 in a spawned process, and so does `tests/test_gnn.py` |
+| `run-all` | builds the graph from the run it just extracted | `extraction.default_run` (the Gemma run) is for the individual commands |
+
+Tests: 56, all pass.

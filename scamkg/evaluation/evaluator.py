@@ -71,11 +71,19 @@ class Evaluator:
                 sets[ds] = ids
         for pair in ctx.cfg["data"].get("mixed_external") or []:
             pos_ds, neg_ds = pair
-            pos = [i for i in ctx.ids(dataset=pos_ds) if ctx.calls.at[i, "label"] == 1]
-            neg = [i for i in ctx.ids(dataset=neg_ds) if ctx.calls.at[i, "label"] == 0]
+            pos = [i for i in self._held_out(pos_ds) if ctx.calls.at[i, "label"] == 1]
+            neg = [i for i in self._held_out(neg_ds) if ctx.calls.at[i, "label"] == 0]
             if pos and neg:
-                sets[f"{pos_ds}+{neg_ds}"] = pos + neg
+                sets[f"{self._set_name(pos_ds)}+{self._set_name(neg_ds)}"] = pos + neg
         return sets
+
+    def _held_out(self, dataset: str) -> list[str]:
+        """Calls of `dataset` no model was trained on: only the test split of the primary data set."""
+        ctx = self.ctx
+        return ctx.ids(split="test", dataset=dataset) if dataset == ctx.primary else ctx.ids(dataset=dataset)
+
+    def _set_name(self, dataset: str) -> str:
+        return f"{dataset}_test" if dataset == self.ctx.primary else dataset
 
     def eval_ids(self) -> list[str]:
         seen, out = set(), []

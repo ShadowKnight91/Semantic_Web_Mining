@@ -26,16 +26,22 @@ def require(*modules: str) -> None:
         raise RuntimeError(f"Missing optional dependencies {missing}: pip install -r requirements-deep.txt")
 
 
-def _device():
+def _device(preference: str = "auto"):
+    """`auto`: CUDA, else Apple-silicon MPS, else CPU. Set models.transformer.device: cpu for bit-reproducible runs."""
     import torch
-    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if preference != "auto":
+        return torch.device(preference)
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    return torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
 
-def sbert_encode(texts: list[str], model_name: str, chunk_words: int = 180, batch_size: int = 32) -> np.ndarray:
+def sbert_encode(texts: list[str], model_name: str, chunk_words: int = 180, batch_size: int = 32,
+                 device: str = "auto") -> np.ndarray:
     """Mean-pooled, L2-normalized sentence embeddings over word chunks (handles long transcripts)."""
     require("sentence_transformers")
     from sentence_transformers import SentenceTransformer
-    model = SentenceTransformer(model_name, device=str(_device()))
+    model = SentenceTransformer(model_name, device=str(_device(device)))
     chunks, owners = [], []
     for i, t in enumerate(texts):
         words = str(t).split() or [""]
@@ -63,7 +69,8 @@ def call_embeddings(ctx, ids: list[str]) -> np.ndarray:
     missing = [c for c in ids if c not in cache]
     if missing:
         log.info("Encoding %d calls with %s", len(missing), scfg["model_name"])
-        emb = sbert_encode(ctx.texts(missing), scfg["model_name"], int(scfg.get("chunk_words", 180)))
+        emb = sbert_encode(ctx.texts(missing), scfg["model_name"], int(scfg.get("chunk_words", 180)),
+                           device=ctx.cfg["models"]["transformer"].get("device", "auto"))
         cache.update(zip(missing, emb))
         path.parent.mkdir(parents=True, exist_ok=True)
         keys = list(cache)
@@ -123,7 +130,8 @@ def run_distilbert(ctx) -> None:
 
     tcfg = ctx.cfg["models"]["transformer"]
     ev = Evaluator(ctx)
-    device = _device()
+    device = _device(tcfg.get("device", "auto"))
+    log.info("DistilBERT on %s", device)
     tok = AutoTokenizer.from_pretrained(tcfg["model_name"])
     L, bs = int(tcfg["max_length"]), int(tcfg["batch_size"])
     tr, va, eval_ids = ctx.train_ids, ctx.val_ids, ev.eval_ids()
@@ -150,7 +158,7 @@ def run_distilbert(ctx) -> None:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 opt.step()
                 sched.step()
-                total += float(loss) * len(yb)
+                total += loss.item() * len(yb)
             ap = float(average_precision_score(yva, _predict(model, Xva, Mva, bs * 2, device)))
             log.info("DistilBERT seed %s epoch %d: train loss %.4f, val PR-AUC %.4f", seed, epoch + 1,
                      total / len(tr), ap)

@@ -2,7 +2,7 @@
 
 Pipeline order (or just `run-all`):
   download | demo-data -> preprocess -> extract -> build-graph -> eda -> annotate-sample -> eval-extraction
-  -> train (E1 E2 E2G E3 E4 E5 LLM) -> cv -> significance -> ablate -> explain -> report -> dashboard
+  -> train (E1 E2 E2G E3 E4 E5 LLM) -> cv -> loto -> significance -> ablate -> explain -> report -> dashboard
 """
 from __future__ import annotations
 
@@ -60,6 +60,13 @@ def cmd_extract(args, cfg):
         calls = calls[calls["dataset"].isin(args.datasets)]
     if args.splits:
         calls = calls[calls["split"].isin(args.splits)]
+    if args.ids_file:
+        ids = _read_call_ids(Path(args.ids_file))
+        missing = [c for c in ids if c not in calls.index]
+        if missing:
+            log.warning("%d call ids from %s are not in the processed calls (e.g. %s)", len(missing), args.ids_file,
+                        missing[:3])
+        calls = calls[calls.index.isin(ids)]
     models = args.model or [None]
     versions = args.prompt_version or [None]
     if getattr(args, "no_fallback", False):
@@ -72,7 +79,16 @@ def cmd_extract(args, cfg):
             # rule extraction takes seconds -> always recompute; LLM runs resume (responses are also cached)
             resume = not args.no_resume and args.extractor == "llm"
             run_extraction(calls, ex, ctx.paths.extractions, run_name=run_name, resume=resume,
-                           max_workers=args.workers or int(cfg["llm"].get("max_workers", 1)), limit=args.limit)
+                           max_workers=args.workers or int(cfg["llm"].get("max_workers", 1)), limit=args.limit,
+                           seed=ctx.seed)
+
+
+def _read_call_ids(path: Path) -> list[str]:
+    """Call ids from a JSONL file with a `call_id` field (e.g. data/annotations/sample.jsonl) or one id per line."""
+    from scamkg.utils import read_jsonl
+    if path.suffix == ".jsonl":
+        return [str(r["call_id"]) for r in read_jsonl(path)]
+    return [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
 def cmd_annotate_sample(args, cfg):
@@ -112,7 +128,7 @@ def cmd_build_graph(args, cfg):
             store.load(kg, ctx.calls)
             structural = store.compute_features(kg, cfg["graph"], ctx.seed)
             store.export_csv(ctx.paths.kg / "neo4j_export")
-    ctx.attach_graph(str(run_path), structural=structural)
+    ctx.attach_graph(str(run_path), structural=structural, use_cache=False)
     kg, run = ctx.kg, ctx.run_name
     kg.write_graphml(ctx.paths.kg / f"kg__{run}.graphml", ctx.calls)
     nodes, edges = kg.to_frames(ctx.calls)
@@ -152,6 +168,34 @@ def _deep_ok(*mods: str) -> bool:
     return not missing
 
 
+def _deep_worker(experiment: str, cfg: dict, run: str | None) -> None:
+    from scamkg.context import Context
+    set_seed(int(cfg["project"]["seed"]))
+    ctx = Context.load(cfg, with_graph=experiment == "E4", run=run)
+    ctx.run_name = ctx.run_name or run  # recorded in metrics.csv
+    if experiment == "E3":
+        from scamkg.models.transformer import run_distilbert, run_sbert_mlp
+        if _deep_ok("torch", "sentence_transformers"):
+            run_sbert_mlp(ctx)
+        if _deep_ok("torch", "transformers"):
+            run_distilbert(ctx)
+    elif experiment == "E4" and _deep_ok("torch"):
+        from scamkg.models.gnn import run_graphsage
+        run_graphsage(ctx)
+
+
+def run_deep_isolated(experiment: str, cfg: dict, run: str | None) -> None:
+    """Run the torch part of E3/E4 in a fresh process. PyTorch and XGBoost bundle different OpenMP
+    runtimes on macOS; once both have run in one process XGBoost segfaults or deadlocks, which would
+    break every XGBoost model, CV fold and ablation that follows E3/E4."""
+    import multiprocessing
+    p = multiprocessing.get_context("spawn").Process(target=_deep_worker, args=(experiment, cfg, run))
+    p.start()
+    p.join()
+    if p.exitcode != 0:
+        raise RuntimeError(f"{experiment} failed in its worker process (exit code {p.exitcode})")
+
+
 def cmd_train(args, cfg):
     from scamkg.context import Context
     exps = args.experiments or ["E1", "E2", "E2G", "E5"] + (["E3", "E4"] if has_module("torch") else [])
@@ -161,14 +205,11 @@ def cmd_train(args, cfg):
         from scamkg.models.classical import run_classical
         run_classical(ctx, classical, args.models, tune=not args.no_tune)
     if "E3" in exps:
-        from scamkg.models.transformer import run_distilbert, run_sbert_mlp
-        if _deep_ok("torch", "sentence_transformers"):
-            run_sbert_mlp(ctx)
-        if _deep_ok("torch", "transformers"):
-            run_distilbert(ctx)
+        run_deep_isolated("E3", cfg, ctx.run_name)
     if "E4" in exps and _deep_ok("torch"):
-        from scamkg.models.gnn import run_graphsage
-        run_graphsage(ctx)
+        from scamkg.models.gnn import run_graphsage_xgb
+        run_deep_isolated("E4", cfg, ctx.run_name)
+        run_graphsage_xgb(ctx)
     if "E5" in exps:
         from scamkg.models.clustering import run_clustering
         run_clustering(ctx)
@@ -183,6 +224,14 @@ def cmd_cv(args, cfg):
     exps = args.experiments or ["E1", "E2", "E2G"]
     ctx = Context.load(cfg, with_graph=any(e != "E1" for e in exps), run=args.run)
     run_cv(ctx, exps, args.models, args.folds)
+
+
+def cmd_loto(args, cfg):
+    from scamkg.context import Context
+    from scamkg.models.classical import run_loto
+    exps = args.experiments or ["E1", "E2", "E2G"]
+    ctx = Context.load(cfg, with_graph=any(e != "E1" for e in exps), run=args.run)
+    run_loto(ctx, exps, args.models)
 
 
 def cmd_significance(args, cfg):
@@ -287,8 +336,11 @@ def cmd_run_all(args, cfg):
     elif args.download:
         cmd_download(args, cfg)
     cmd_preprocess(args, cfg)
-    cmd_extract(ns(extractor=args.extractor, datasets=None, splits=None, model=args.model, prompt_version=None,
-                   provider=None, run_name=None, no_resume=False, workers=None, limit=None, no_fallback=False), cfg)
+    cmd_extract(ns(extractor=args.extractor, datasets=None, splits=None, ids_file=None, model=args.model,
+                   prompt_version=None, provider=None, run_name=None, no_resume=False, workers=None, limit=None,
+                   no_fallback=False), cfg)
+    # every later step uses the run just extracted (the most recent one), not extraction.default_run
+    cfg = {**cfg, "extraction": {**(cfg.get("extraction") or {}), "default_run": None}}
     cmd_build_graph(ns(run=None, backend="neo4j" if args.with_neo4j else None, no_rdf=False), cfg)
     cmd_eda(ns(run=None), cfg)
     cmd_annotate_sample(ns(n=50, from_synthetic=demo), cfg)
@@ -298,6 +350,7 @@ def cmd_run_all(args, cfg):
         exps += ["E3", "E4"]
     cmd_train(ns(experiments=exps, models=None, no_tune=False, run=None, limit=None), cfg)
     cmd_cv(ns(experiments=None, models=None, folds=None, run=None), cfg)
+    cmd_loto(ns(experiments=None, models=None, run=None), cfg)
     cmd_significance(args, cfg)
     cmd_ablate(ns(experiments=None, models=None, run=None), cfg)
     ctx = Context.load(cfg)
@@ -337,7 +390,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="v1_full | v2_no_descriptors | v3_no_example | v0_open (several = prompt ablation)")
     s.add_argument("--datasets", nargs="+", default=None)
     s.add_argument("--splits", nargs="+", default=None)
-    s.add_argument("--limit", type=int, default=None, help="only the first N pending calls (pilot run)")
+    s.add_argument("--limit", type=int, default=None, help="a seeded random sample of N pending calls (pilot run)")
+    s.add_argument("--ids-file", default=None,
+                   help="only these calls: JSONL with call_id (e.g. data/annotations/sample.jsonl) or one id per line")
     s.add_argument("--workers", type=int, default=None)
     s.add_argument("--run-name", default=None)
     s.add_argument("--no-resume", action="store_true")
@@ -368,7 +423,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--models", nargs="+", choices=["lr", "svm", "rf", "xgb"], default=None)
     s.add_argument("--no-tune", action="store_true", help="reuse best_params.json / defaults")
     s.add_argument("--run", default=None)
-    s.add_argument("--limit", type=int, default=None, help="LLM zero-shot: calls per evaluation set")
+    s.add_argument("--limit", type=int, default=None, help="LLM zero-shot: sampled calls per evaluation set")
     s.set_defaults(fn=cmd_train)
     s = sub.add_parser("cv", help="5-fold stratified cross-validation (mean +- std)")
     s.add_argument("--experiments", nargs="+", choices=["E1", "E2", "E2G"], default=None)
@@ -376,6 +431,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--folds", type=int, default=None)
     s.add_argument("--run", default=None)
     s.set_defaults(fn=cmd_cv)
+    s = sub.add_parser("loto", help="leave-one-type-out: generalization to unseen scam / legitimate call types")
+    s.add_argument("--experiments", nargs="+", choices=["E1", "E2", "E2G"], default=None)
+    s.add_argument("--models", nargs="+", choices=["lr", "svm", "rf", "xgb"], default=None)
+    s.add_argument("--run", default=None)
+    s.set_defaults(fn=cmd_loto)
     sub.add_parser("significance", help="McNemar tests E1 vs E2/E2G").set_defaults(fn=cmd_significance)
     s = sub.add_parser("cluster", help="E5: K-Means / DBSCAN scam-script discovery")
     s.add_argument("--run", default=None)
@@ -397,7 +457,8 @@ def build_parser() -> argparse.ArgumentParser:
         s = sub.add_parser(name, help=hlp)
         s.add_argument("--model", default=None)
         s.add_argument("--provider", default=None)
-        s.add_argument("--limit", type=int, default=None)
+        s.add_argument("--limit", type=int, default=None,
+                       help="a seeded, label-stratified sample of N calls (per evaluation set for zeroshot)")
         s.set_defaults(fn=fn)
     s = sub.add_parser("multiclass", help="three-way classification (stretch goal)")
     s.add_argument("--run", default=None)
@@ -408,7 +469,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--file", default=None)
     s.add_argument("--experiment", default="E2", choices=["E1", "E2", "E2G"])
     s.add_argument("--model", default="xgb", choices=["lr", "svm", "rf", "xgb"])
-    s.add_argument("--extractor", default="rule", choices=["rule", "llm"])
+    s.add_argument("--extractor", default=None, choices=["rule", "llm"],
+                   help="default: the extractor that built the knowledge graph")
     s.set_defaults(fn=cmd_predict)
     s = sub.add_parser("banksim", help="optional BankSim graph baseline from prior projects")
     s.add_argument("--path", default=None)

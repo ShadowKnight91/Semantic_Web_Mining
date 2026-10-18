@@ -29,6 +29,10 @@ SCAM_STRINGS = {"1", "scam", "fraud", "fraudulent", "yes", "true", "spam", "mali
                 "scammer", "suspicious"}
 LEGIT_STRINGS = {"0", "non scam", "nonscam", "not scam", "no scam", "legit", "legitimate", "normal", "no", "false",
                  "ham", "genuine", "benign", "non fraud", "not fraud"}
+# BothBosu's dialogue types give gold three-way labels (stretch goal): every scam type is a fraudster,
+# insurance / telemarketing offers are salespeople, deliveries and wrong numbers are other legitimate calls.
+BOTHBOSU_LABEL3 = {"insurance": "salesperson", "telemarketing": "salesperson", "delivery": "other_legitimate",
+                   "wrong": "other_legitimate"}
 
 
 def unify_label(v) -> int:
@@ -86,6 +90,25 @@ def _read_tables(directory: Path) -> pd.DataFrame | None:
     return pd.concat(frames, ignore_index=True) if frames else None
 
 
+def _read_labeled_txt(directory: Path) -> pd.DataFrame | None:
+    """Kaggle "Scam and Non-Scam Call Conversation" layout (teeconnie): English_Scam.txt / English_NonScam.txt,
+    one call per paragraph (scam calls numbered "1.<tab>"); the label comes from the file name."""
+    files = sorted(directory.glob("*.txt")) if directory.exists() else []
+    if any("english" in f.stem.lower() for f in files):     # other-language files of the same release
+        files = [f for f in files if "english" in f.stem.lower()]
+    rows = []
+    for f in files:
+        name = re.sub(r"[^a-z]", "", f.stem.lower())
+        label = (0 if ("nonscam" in name or "notscam" in name or "legit" in name)
+                 else 1 if ("scam" in name or "fraud" in name) else None)
+        if label is None:
+            continue
+        text = f.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
+        blocks = [b.strip() for b in re.split(r"\n\s*\n", text) if b.strip()]
+        rows += [(f"{f.stem}_{k:04d}", re.sub(r"^\d+\.\s+", "", b), label) for k, b in enumerate(blocks)]
+    return pd.DataFrame(rows, columns=["id", "text", "label"]) if rows else None
+
+
 def _frame(dataset: str, raw_text, label, source_id=None, subtype=None) -> pd.DataFrame:
     n = len(raw_text)
     return pd.DataFrame({
@@ -122,44 +145,26 @@ def load_bothbosu(cfg: dict, paths: Paths) -> pd.DataFrame | None:
     sub_col = _find_col(df, SUBTYPE_CANDIDATES)
     if text_col is None or label_col is None:
         raise KeyError(f"BothBosu: cannot find text/label columns in {list(df.columns)}")
-    return _frame("bothbosu", df[text_col].astype(str), df[label_col], df.index.astype(str),
-                  df[sub_col] if sub_col else None)
-
-
-def _read_labeled_txt(directory: Path) -> pd.DataFrame | None:
-    """Plain-text layout of teeconnie/scam-and-non-scam-call-conversation-dataset: English_Scam.txt and
-    English_NonScam.txt, one call per paragraph (blank line between calls). The label comes from the
-    file name. CHANGE: the scam file numbers its calls ("12.<TAB>..."); the numbers are stripped,
-    otherwise a text model could detect scams just by the leading number."""
-    rows = []
-    for f in sorted(directory.glob("*.txt")) if directory.exists() else []:
-        name = f.stem.lower().replace("-", "").replace("_", "").replace(" ", "")
-        if "nonscam" in name or "notscam" in name or "legit" in name:
-            label = 0
-        elif "scam" in name or "fraud" in name:
-            label = 1
-        else:
-            continue
-        text = f.read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n")
-        for k, block in enumerate(re.split(r"\n\s*\n", text)):
-            block = re.sub(r"^\s*\d+\s*[.)]\s*", "", block.strip())
-            if block:
-                rows.append({"id": f"{f.stem}_{k}", "text": block, "label": label})
-    if rows:
-        log.info("Kaggle: read %d calls from text files in %s", len(rows), directory)
-    return pd.DataFrame(rows) if rows else None
+    out = _frame("bothbosu", df[text_col].astype(str), df[label_col], df.index.astype(str),
+                 df[sub_col] if sub_col else None)
+    out["label3"] = ["fraudster" if lab == 1 else BOTHBOSU_LABEL3.get(st.lower(), "") if lab == 0 else ""
+                     for lab, st in zip(out["label"], out["subtype"])]
+    return out
 
 
 def load_kaggle(cfg: dict, paths: Paths) -> pd.DataFrame | None:
     """Kaggle scam / non-scam call conversations; handles one-row-per-call and one-row-per-turn layouts,
     and the English_Scam.txt / English_NonScam.txt layout of the data set cited in the proposal."""
     src = _src(cfg, "kaggle")
-    df = _read_tables(_dir(paths, src, "kaggle"))
+    directory = _dir(paths, src, "kaggle")
+    df = _read_tables(directory)
     if df is None:
-        df = _read_labeled_txt(_dir(paths, src, "kaggle"))
-    if df is None:
-        log.warning("Kaggle data not found in data/raw/kaggle - see README (Data sets)")
-        return None
+        txt = _read_labeled_txt(directory)
+        if txt is None:
+            log.warning("Kaggle data not found in data/raw/kaggle - see README (Data sets)")
+            return None
+        log.info("Kaggle: %d calls from labeled text files", len(txt))
+        return _frame("kaggle", txt["text"], txt["label"], txt["id"])
     text_col = _find_col(df, TEXT_CANDIDATES, src.get("text_col"))
     label_col = _find_col(df, LABEL_CANDIDATES, src.get("label_col"))
     id_col = _find_col(df, ID_CANDIDATES, src.get("id_col"))

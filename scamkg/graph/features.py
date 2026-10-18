@@ -9,10 +9,12 @@ unsupervised, so no labels leak:
 
 Label-based features are recomputed for every training set and use ONLY the labels of the
 "labeled" calls (train, or train+val for the final model). Training calls get out-of-fold values
-(5-fold, default; `graph.label_encoding: loo` restores leave-one-out) so their own label never enters
-their own features:
+(K-fold cross-fitting, `graph.label_folds`), so their own label never enters their own features:
   community_scam_rate, sim_scam_max, sim_legit_max, sim_scam_topk, sim_legit_topk, sim_diff,
   knn_scam_rate, entity_risk_mean/max/min, n_known_entities
+Leave-one-out alone is not enough: within a community (or for an entity) the LOO rate of a scam
+call is always lower than that of a legitimate one, so a tree can read the label back from it.
+K-fold values break that deterministic link (the same cross-fitting as scikit-learn's TargetEncoder).
 """
 from __future__ import annotations
 
@@ -20,6 +22,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 from scipy import sparse
+from sklearn.model_selection import KFold
 
 from scamkg.graph.build import CallKG, call_node
 from scamkg.ontology.schema import Ontology
@@ -185,30 +188,25 @@ class GraphFeatureBuilder:
     def build(self, labeled_ids: list[str], labels) -> pd.DataFrame:
         """Structural features + label-based features from `labels` of `labeled_ids` only.
 
-        CHANGE: training calls now get out-of-fold (OOF) values by default instead of leave-one-out (LOO).
-        With LOO, a training call's community_scam_rate / entity_risk is (sum - own_label) / (n - 1), so
-        inside one community scams always get a slightly *lower* value than legitimate calls. Tree models
-        (RF, XGBoost) learn that artefact and it reverses on test calls, which get the plain rate. In a
-        simulation (1,200 calls, 60 communities, 20 seeds) XGBoost reached test PR-AUC 0.587 with LOO vs
-        0.659 with 5-fold OOF; logistic regression was unaffected (0.699 both). OOF is the same cross-fitting
-        scikit-learn's TargetEncoder uses. Unlabeled calls (val / test / external) still use all labels.
+        Unlabeled calls (val / test / external) see every label. Labeled (training) calls get K-fold
+        out-of-fold values (`graph.label_folds`; leave-one-out when there are too few labeled calls). With
+        leave-one-out alone, a training call's community_scam_rate / entity_risk is (sum - own_label) / (n - 1),
+        so inside one community scams always get a slightly *lower* value than legitimate calls. Tree models
+        learn that artefact and it reverses on test calls, which get the plain rate (simulation with 1,200
+        calls, 60 communities, 20 seeds: XGBoost test PR-AUC 0.587 with LOO vs 0.659 with 5-fold OOF).
         """
         idx = np.array([self.kg.call_index[c] for c in labeled_ids], dtype=int)
         y = np.asarray(labels, dtype=float)
         community = self.structural["community_id"].to_numpy()
         lab = label_features(self.kg, idx, y, community, self.gcfg)
-        mode = str(self.gcfg.get("label_encoding", "oof")).lower()
-        k = min(int(self.gcfg.get("label_encoding_folds", 5)), len(idx))
-        if mode == "oof" and k >= 2 and len(np.unique(y)) > 1:
-            from sklearn.model_selection import KFold
-            # plain (not stratified) folds: the fold assignment itself must not depend on any label
-            splitter = KFold(k, shuffle=True, random_state=self.seed)
-            cols = lab.columns
-            vals = lab.to_numpy(copy=True)
-            for fit_part, held_out in splitter.split(idx):
-                f = label_features(self.kg, idx[fit_part], y[fit_part], community, self.gcfg)
-                vals[idx[held_out]] = f.to_numpy()[idx[held_out]]
-            lab = pd.DataFrame(vals, index=lab.index, columns=cols)
+        k = int(self.gcfg.get("label_folds", 5))
+        if k > 1 and len(idx) >= 2 * k:
+            # plain (not stratified) folds: the fold assignment itself must not depend on any label, so a
+            # call's own label can never move it to another fold and change its features
+            splitter = KFold(n_splits=k, shuffle=True, random_state=self.seed)
+            for fit, held in splitter.split(idx):
+                part = label_features(self.kg, idx[fit], y[fit], community, self.gcfg)
+                lab.iloc[idx[held]] = part.iloc[idx[held]].to_numpy()
         return self.structural.drop(columns=["community_id"]).join(lab)
 
     def columns(self, groups: list[str] | None = None) -> list[str]:

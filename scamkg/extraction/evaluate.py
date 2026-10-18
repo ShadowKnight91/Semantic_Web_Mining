@@ -34,18 +34,43 @@ Each line of `annotator_A.jsonl` / `annotator_B.jsonl` is one call. Read the tra
 | PAY_VIA | PaymentChannel | `gift_card`, `wire_transfer`, `crypto`, `zelle`, `p2p_app`, `bank_transfer`, `cash`, `check_or_money_order`, `credit_card_payment`, `other` |
 | PROVIDES_NUMBER | CallbackNumber | the number as given, e.g. `1-888-555-0142`, `press 1` |
 
-Set `"annotated": true` on every call you have finished - also when the caller states none of these
-facts (then leave `triples` empty). Calls without the flag and without triples are treated as not yet
-annotated and are skipped.
-
 Example lines:
 ```json
-{"call_id": "bothbosu_00012", "annotator": "A", "annotated": true, "triples": [
+{"call_id": "bothbosu_00012", "annotator": "A", "done": true, "triples": [
   {"relation": "CLAIMS_TO_BE", "object": "government_agent"},
   {"relation": "USES_TACTIC", "object": "threat", "inferred": false}]}
-{"call_id": "bothbosu_00013", "annotator": "A", "annotated": true, "triples": []}
+{"call_id": "bothbosu_00013", "annotator": "A", "done": true, "triples": []}
 ```
-Full allowed values and descriptors: `ontology/ontology.yaml`. Annotate independently; afterwards
+Set `"done": true` on every call you have annotated - also when the caller states no ontology facts
+at all (e.g. a wrong number): such a call stays a gold example with no triples, so any triple an
+extractor invents for it counts as a false positive. Calls with `"done": false` and no triples are
+treated as not yet annotated. Full allowed values and descriptors: `ontology/ontology.yaml`.
+
+Decision rules (used for annotator A; follow them so agreement measures the extractors, not the rules):
+* CLAIMS_TO_BE - who the caller presents as. "Officer X from the SSA" = `government_agent`; a caller from an
+  insurance company = `insurance`; other sellers = `telemarketer_sales`; a prize / gift-card giveaway =
+  `prize_or_lottery` (if the caller also claims another type, e.g. "we're a marketing firm", annotate both).
+  A private person (wrong number, a customer calling a company) gets no identity; `relative_or_friend` only
+  for the receiver's own family or friends.
+* MENTIONS_ORG - every company or agency the caller names, placeholders ("XYZ Company") and brands (Dell)
+  included; not generic references ("your bank"), not organizations only the receiver names, and "social
+  security number" is not a mention of the SSA.
+* USES_TACTIC - `urgency`: explicit time pressure or a deadline (today, immediately, within 48 hours, limited
+  time); `threat`: arrest, legal action, suspension, fines, account closure; `reward`: refunds, prizes, free
+  gifts, discounts, special deals (sales calls too); `fear`: suspicious activity, unauthorized charges, hacked /
+  compromised accounts, viruses; `secrecy`: an explicit instruction to stay on the line or not to contact / call
+  back the real organization. A delivery arriving "today" is not urgency.
+* REQUESTS - only what the caller asks the receiver for: `ssn` (also the last four digits), `personal_info`
+  (name, address, date of birth, email, phone number, policy details, "whose number is this?"),
+  `card_number`, `bank_account`, `password`, `otp`, `remote_access` (also downloading a "support tool" or being
+  talked through system settings - mark it inferred), `money` (fees, fines, payments).
+* PAY_VIA - only how money is meant to move; a gift card that is the prize is not a payment channel, and a
+  refund "deposited into your account" is `bank_transfer`.
+* PROVIDES_NUMBER - phone numbers, extensions and "press N" options the caller gives; not badge, order,
+  tracking or case numbers, and not websites.
+* Mark `"inferred": true` when a fact is implied rather than stated.
+
+Annotate independently; afterwards
 adjudicate disagreements into `gold.jsonl` (same format). `python -m scamkg eval-extraction`
 reports agreement and scores every extraction run.
 """
@@ -69,11 +94,11 @@ def create_annotation_sample(calls: pd.DataFrame, out_dir: Path, n: int = 50, se
     for annot in ("A", "B"):
         path = out_dir / f"annotator_{annot}.jsonl"
         if not path.exists():
-            write_jsonl(path, ({"call_id": cid, "annotator": annot, "annotated": False, "triples": []}
+            write_jsonl(path, ({"call_id": cid, "annotator": annot, "done": False, "triples": []}
                                for cid in sample.index))
     (out_dir / "README.md").write_text(ANNOTATION_GUIDE, encoding="utf-8")
     if from_synthetic and "gold_triples" in sample.columns:
-        write_jsonl(out_dir / "gold.jsonl", ({"call_id": cid, "annotator": "synthetic",
+        write_jsonl(out_dir / "gold.jsonl", ({"call_id": cid, "annotator": "synthetic", "done": True,
                                                "triples": r["gold_triples"] or []} for cid, r in sample.iterrows()))
         log.info("Wrote synthetic gold triples for %d calls", len(sample))
     log.info("Annotation sample of %d calls written to %s", len(sample), out_dir)
@@ -82,13 +107,13 @@ def create_annotation_sample(calls: pd.DataFrame, out_dir: Path, n: int = 50, se
 
 def load_annotations(path: Path, ontology: Ontology, standardizer: EntityStandardizer,
                      all_annotated: bool = False) -> dict[str, list[dict]]:
-    """Annotated calls only. CHANGE: a call annotated as having *no* facts is kept with an empty list.
-    Before, every empty call was dropped, so false-positive triples on fact-free (often legitimate)
-    calls were never counted and triple precision was inflated. A call counts as annotated when it has
-    triples, has "annotated": true, or comes from the adjudicated gold.jsonl (`all_annotated`)."""
+    """Annotated calls only. A call counts as annotated when it has triples, is marked `"done": true`
+    (`"annotated": true` is accepted too) or comes from the adjudicated gold.jsonl (`all_annotated`).
+    A call annotated as having *no* facts is kept with an empty list, so false-positive triples on
+    fact-free (often legitimate) calls are counted and triple precision is not inflated."""
     out = {}
     for rec in read_jsonl(path):
-        if not (all_annotated or rec.get("triples") or rec.get("annotated")):
+        if not (all_annotated or rec.get("triples") or rec.get("done") or rec.get("annotated")):
             continue
         raw = []
         for t in rec.get("triples", []):
@@ -125,12 +150,14 @@ def compare_to_gold(pred: dict[str, list[dict]], gold: dict[str, list[dict]]) ->
             per_rel[rel][2] += 1
         macro_p.append(len(inter) / len(p) if p else (1.0 if not g else 0.0))
         macro_r.append(len(inter) / len(g) if g else 1.0)
-        gold_types = {match_key(t["object"]): t["object_type"] for t in gtriples}
+        # entity-type accuracy judges the type the extractor itself gave (before schema repair) for objects
+        # that also occur in the gold triples; "other" exists in several types, so it identifies nothing
+        gold_types = {match_key(t["object"]): t["object_type"] for t in gtriples if t["object"] != "other"}
         for t in pred.get(cid, []):
             k = match_key(t["object"])
             if k in gold_types:
                 type_total += 1
-                type_correct += int(gold_types[k] == t["object_type"])
+                type_correct += int(gold_types[k] == t.get("raw_type", t["object_type"]))
     prec = tp / (tp + fp) if tp + fp else 0.0
     rec = tp / (tp + fn) if tp + fn else 0.0
     f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0

@@ -56,7 +56,9 @@ def clean_transcript(raw: str) -> tuple[str, str, int]:
     """Return (text with normalized speaker lines, plain text without tags, number of turns)."""
     s = unicodedata.normalize("NFKC", str(raw or ""))
     s = s.replace("\r", "\n")
-    s = re.sub(r"\[[^\]]{0,40}\]", " ", s)                      # [noise], [inaudible], [00:01:23]
+    s = re.sub(r"^\s*(?:\[[^\]]{0,40}\]\s*)+[,.!]?\s*", "", s)   # leading template slots: "[Greetings], this is"
+    s = re.sub(r"\[[^\]]{0,40}\]\s*,", " ", s)                   # "[Name], it is me" -> "it is me"
+    s = re.sub(r"\[[^\]]{0,40}\]", " ", s)                      # [noise], [inaudible], [00:01:23], [Company]
     s = re.sub(r"<[^>]{0,20}>", " ", s)                         # <unk>, <laugh>
     s = re.sub(r"\((?:inaudible|crosstalk|laughs?|laughter|silence|music|noise|pause|beep)[^)]*\)", " ", s, flags=re.I)
     s = re.sub(r"([!?.,])\1{2,}", r"\1", s)                     # repeated punctuation
@@ -109,21 +111,25 @@ def preprocess(cfg: dict, paths: Paths) -> pd.DataFrame:
     df = df[df["n_words"] >= int(dcfg.get("min_words", 5))]
     log.info("Dropped %d calls shorter than %s words", before - len(df), dcfg.get("min_words", 5))
 
-    key = df["text_plain"].str.lower().str.replace(r"[^a-z0-9]", "", regex=True)
+    df["_k"] = df["text_plain"].str.lower().str.replace(r"[^a-z0-9]", "", regex=True)
     labeled = df["label"] >= 0
-    conflicts = df[labeled].assign(_k=key[labeled]).groupby("_k")["label"].nunique()
+    conflicts = df[labeled].groupby("_k")["label"].nunique()
     bad_keys = set(conflicts[conflicts > 1].index)
     n_conflict = len(bad_keys)
-    # CHANGE: a transcript that appears with both labels is dropped entirely. Before, the first copy was
-    # kept with whichever label it happened to have, i.e. a coin-flip label in train or test.
-    conflict_rows = key.isin(bad_keys)
-    df, key = df[~conflict_rows.to_numpy()], key[~conflict_rows]
-    dup = key.duplicated(keep="first")
-    log.info("Removed %d duplicate transcripts and %d transcripts with conflicting labels (%d rows)",
-             int(dup.sum()), n_conflict, int(conflict_rows.sum()))
-    df = df[~dup.to_numpy()].reset_index(drop=True)
-
+    within = df.duplicated(["dataset", "_k"], keep="first")
+    df = df[~within.to_numpy()].reset_index(drop=True)
+    # ids are numbered per data set *before* removing transcripts that also occur in an earlier data set, so
+    # adding or dropping a data set never shifts the ids of another one (annotations, LLM runs and caches use them)
     df["call_id"] = [f"{ds}_{i:05d}" for ds, i in zip(df["dataset"], df.groupby("dataset").cumcount())]
+    # a transcript that appears with both labels is dropped entirely; keeping the first copy would give it a
+    # coin-flip label in train or test
+    conflict = df["_k"].isin(bad_keys)
+    across = df["_k"].duplicated(keep="first") & ~conflict
+    df = df[~(across | conflict).to_numpy()].drop(columns="_k").reset_index(drop=True)
+    dup = int(within.sum() + across.sum())
+    log.info("Removed %d duplicate transcripts (%d within, %d across data sets) and %d transcripts with "
+             "conflicting labels (%d rows)", dup, int(within.sum()), int(across.sum()), n_conflict,
+             int(conflict.sum()))
     df = df.set_index("call_id", drop=False)
     df = assign_splits(df, dcfg["primary"], float(dcfg["val_size"]), float(dcfg["test_size"]),
                        int(cfg["project"]["seed"]))
@@ -132,7 +138,7 @@ def preprocess(cfg: dict, paths: Paths) -> pd.DataFrame:
     paths.processed.mkdir(parents=True, exist_ok=True)
     write_jsonl(paths.calls_file, df[cols].to_dict(orient="records"))
     summary = (df.groupby(["dataset", "split", "label"]).size().rename("n").reset_index())
-    save_json(paths.processed / "summary.json", {"n_calls": len(df), "duplicates_removed": int(dup.sum()),
+    save_json(paths.processed / "summary.json", {"n_calls": len(df), "duplicates_removed": dup,
                                                  "label_conflicts": n_conflict,
                                                  "counts": summary.to_dict(orient="records")})
     log.info("Wrote %d calls to %s", len(df), paths.calls_file)

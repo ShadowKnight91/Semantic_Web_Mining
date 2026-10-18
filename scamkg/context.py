@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -12,16 +13,20 @@ from scamkg.extraction.extractor import load_extraction_run, resolve_run
 from scamkg.graph.build import CallKG
 from scamkg.graph.features import GraphFeatureBuilder, structural_features
 from scamkg.ontology.schema import Ontology
-from scamkg.utils import get_logger
+from scamkg.utils import get_logger, sha256_text
 
 log = get_logger(__name__)
 
 GRAPH_CFG_KEYS = ("similarity_top_k", "similarity_min", "louvain_resolution", "betweenness_samples")
 
 
-def structural_cache_path(paths: Paths, run_name: str, cfg: dict):
-    key = config_hash({k: cfg["graph"].get(k) for k in GRAPH_CFG_KEYS} | {"seed": cfg["project"]["seed"]})
-    return paths.graph_features / f"structural__{run_name}__{key}.csv"
+def structural_cache_path(paths: Paths, run_path: Path, cfg: dict, call_ids: list[str]):
+    """Keyed by the graph settings and the content of the extraction run and call set, so a run that
+    is re-extracted under the same name (e.g. after a prompt change) never reuses stale features."""
+    key = config_hash({k: cfg["graph"].get(k) for k in GRAPH_CFG_KEYS} | {
+        "seed": cfg["project"]["seed"], "run": sha256_text(run_path.read_text(encoding="utf-8")),
+        "calls": sha256_text("\n".join(call_ids))})
+    return paths.graph_features / f"structural__{run_path.stem}__{key}.csv"
 
 
 class Context:
@@ -45,7 +50,10 @@ class Context:
         return ctx
 
     # ------------------------------------------------------------------ graph
-    def attach_graph(self, run: str | None = None, structural: pd.DataFrame | None = None) -> "Context":
+    def attach_graph(self, run: str | None = None, structural: pd.DataFrame | None = None,
+                     use_cache: bool = True) -> "Context":
+        """`structural` (e.g. Neo4j GDS features) or the cached features of this run are reused; build-graph
+        passes use_cache=False so the backend it runs decides the features every later command uses."""
         run_path = resolve_run(self.paths.extractions, run or self.cfg.get("extraction", {}).get("default_run"))
         self.run_name = run_path.stem
         self.extractions = load_extraction_run(run_path)
@@ -54,8 +62,8 @@ class Context:
             log.warning("%d calls have no extraction in run %s (treated as having no entities)", len(missing),
                         self.run_name)
         self.kg = CallKG(self.calls.index.tolist(), self.extractions, self.ontology)
-        cache = structural_cache_path(self.paths, self.run_name, self.cfg)
-        if structural is None and cache.exists():
+        cache = structural_cache_path(self.paths, run_path, self.cfg, self.kg.call_ids)
+        if structural is None and use_cache and cache.exists():
             structural = pd.read_csv(cache, index_col=0)
             structural.index = structural.index.astype(str)
             log.info("Using cached structural graph features %s", cache.name)
