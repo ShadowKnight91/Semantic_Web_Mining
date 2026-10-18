@@ -19,8 +19,8 @@ import pandas as pd
 from tqdm import tqdm
 
 from scamkg.extraction.llm_client import LLMError
-from scamkg.extraction.prompts import (PROMPT_VERSIONS, RETRY_MESSAGE, build_extraction_messages,
-                                       prompt_fingerprint)
+from scamkg.extraction.prompts import (PROMPT_VERSIONS, RETRY_MESSAGE, RETRY_WRAPPER_MESSAGE,
+                                       build_extraction_messages, prompt_fingerprint, schema_retry_message)
 from scamkg.ontology.schema import Ontology
 from scamkg.ontology.standardize import EntityStandardizer, match_key
 from scamkg.utils import dumps, get_logger, load_json, read_jsonl, save_json, slugify, timestamp
@@ -44,6 +44,14 @@ class ExtractionRecord:
     cached: bool = False
     error: str | None = None
     raw_response: str | None = None
+    # CHANGE (TA comment 1): record what the fallback logic did for every call, so the report can show
+    # JSON-repair, retry, fallback and failure rates instead of a single validity number.
+    # status: ok | repaired | salvaged | fallback | empty | failed
+    status: str = "ok"
+    retry_reasons: list = field(default_factory=list)
+    salvaged: bool = False
+    fallback_used: bool = False
+    model_used: str | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -85,6 +93,50 @@ def parse_json_response(text: str | None) -> Any | None:
     return None
 
 
+def salvage_triples(text: str | None) -> dict | None:
+    """Recover the complete triple objects from a cut-off answer.
+
+    CHANGE (TA comment 1): when the model hits the output-token cap (max_tokens / num_predict) the
+    JSON ends mid-object, e.g. '{"triples": [{...}, {...}, {"relation": "PAY_'. json.loads fails
+    on the whole answer, so every triple was lost before. Here each complete {...} inside the
+    "triples" array is parsed on its own and the unfinished last one is dropped.
+    """
+    if not text:
+        return None
+    start = text.find('"triples"')
+    start = text.find("[", start) if start != -1 else text.find("[")
+    if start == -1:
+        return None
+    objs, depth, obj_start, in_str, esc = [], 0, None, False, False
+    for i in range(start + 1, len(text)):
+        ch = text[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            if depth == 0:
+                obj_start = i
+            depth += 1
+        elif ch == "}" and depth > 0:
+            depth -= 1
+            if depth == 0 and obj_start is not None:
+                try:
+                    objs.append(json.loads(text[obj_start:i + 1]))
+                except json.JSONDecodeError:
+                    pass
+                obj_start = None
+        elif ch == "]" and depth == 0:
+            break
+    return {"triples": objs} if objs else None
+
+
 def _as_bool(v) -> bool:
     if isinstance(v, bool):
         return v
@@ -104,7 +156,8 @@ def validate_triples(obj: Any, ontology: Ontology, standardizer: EntityStandardi
     (True when every raw triple already used a valid relation, the right object type and, for
     closed types, an allowed value).
     """
-    stats = {"n_raw": 0, "n_dropped": 0, "n_repaired": 0, "conformant": True}
+    # CHANGE (TA comment 1): `problems` lists why each triple was dropped; it feeds the schema-specific retry.
+    stats = {"n_raw": 0, "n_dropped": 0, "n_repaired": 0, "conformant": True, "problems": []}
     if isinstance(obj, dict):
         raw = obj.get("triples")
         if raw is None:
@@ -124,13 +177,15 @@ def validate_triples(obj: Any, ontology: Ontology, standardizer: EntityStandardi
         if not isinstance(t, dict):
             stats["n_dropped"] += 1
             stats["conformant"] = False
+            stats["problems"].append("a triple is not a JSON object")
             continue
         rel = _norm_relation(t.get("relation") or t.get("predicate"))
         otype = str(t.get("object_type") or "").strip() or None
         mention = t.get("object")
-        if isinstance(mention, (list, dict)) or mention is None:
+        if isinstance(mention, (list, dict)) or mention is None or not str(mention).strip():
             stats["n_dropped"] += 1
             stats["conformant"] = False
+            stats["problems"].append("missing or non-text 'object' field")
             continue
         mention = str(mention).strip()
         repaired = False
@@ -141,6 +196,8 @@ def validate_triples(obj: Any, ontology: Ontology, standardizer: EntityStandardi
             if fixed is None:
                 stats["n_dropped"] += 1
                 stats["conformant"] = False
+                stats["problems"].append(f"unknown relation {rel or '(missing)'!r}" +
+                                         ("" if otype in ontology.entity_types else f" and object_type {otype!r}"))
                 continue
             rel, repaired = fixed, True
         target = ontology.target_of(rel)
@@ -167,6 +224,7 @@ def validate_triples(obj: Any, ontology: Ontology, standardizer: EntityStandardi
         if canon is None:
             stats["n_dropped"] += 1
             stats["conformant"] = False
+            stats["problems"].append(f"value {mention[:40]!r} is not allowed for {target}")
             continue
         if not conform:
             stats["conformant"] = False
@@ -226,60 +284,140 @@ def truncate_transcript(text: str, max_chars: int) -> str:
 
 # ---------------------------------------------------------------------------- LLM extractor
 class LLMExtractor(BaseExtractor):
+    """Ontology-guided LLM extraction with a layered fallback (TA comment 1).
+
+    For every transcript:
+      1. Ask for JSON (Ollama `format: json` / OpenAI `response_format`), temperature 0.1, fixed seed.
+      2. Parse: strip code fences / prose; if the answer was cut off at the token cap, salvage the
+         complete triple objects (`salvage_triples`).
+      3. Validate every triple against the ontology (`validate_triples`): missing fields -> dropped;
+         unknown relation -> repaired from object_type when possible, else dropped; wrong object type or
+         a value of another closed vocabulary -> re-typed; free text -> standardized to the vocabulary.
+      4. Retry (up to `max_retries`) with feedback for the specific failure:
+           invalid JSON            -> RETRY_MESSAGE
+           JSON without "triples"  -> RETRY_WRAPPER_MESSAGE
+           all triples off-schema  -> schema_retry_message (allowed relations + what was wrong)
+         An honest empty answer {"triples": []} is accepted (legitimate calls may state no facts).
+      5. If the primary model still gives nothing usable (or the request fails), run the same loop once
+         with `fallback_model` (e.g. gemma2:9b when the primary is qwen2.5:7b).
+      6. Grounding check drops triples whose evidence/mention is not in the transcript.
+      7. A call that still fails keeps status "failed" and no triples: it stays in the data set as a
+         Call node with zero graph features (has_entities = 0), so no call is silently dropped, and
+         `run_extraction` retries it on the next resume.
+    """
+
     def __init__(self, client, ontology: Ontology, standardizer: EntityStandardizer | None = None,
                  prompt_version: str = "v1_full", max_retries: int = 2, max_chars: int = 6000,
-                 grounding: bool = True):
+                 grounding: bool = True, fallback_client=None, schema_retry: bool = True):
         if prompt_version not in PROMPT_VERSIONS:
             raise ValueError(f"Unknown prompt version {prompt_version}")
         self.grounding = grounding
         self.client = client
+        self.fallback_client = fallback_client
+        self.schema_retry = schema_retry
         self.ontology = ontology
         self.standardizer = standardizer or EntityStandardizer(ontology)
         self.prompt_version = prompt_version
         self.max_retries = max_retries
         self.max_chars = max_chars
         self.name = f"llm_{client.provider}_{client.model}_{prompt_version}"
+        if fallback_client is not None:   # own run name, so it never mixes with a single-model comparison run
+            self.name += f"_fb-{fallback_client.model}"
+
+    # -------------------------------------------------------------- one model, with retries
+    def _run_model(self, client, messages: list[dict]) -> dict:
+        res = {"obj": None, "triples": [], "stats": None, "raw": None, "attempts": 0, "error": None,
+               "cached": True, "salvaged": False, "reasons": [], "usable": False}
+        best = None   # a parsed-but-imperfect answer kept in case the retries do not improve on it
+        while res["attempts"] <= self.max_retries:
+            res["attempts"] += 1
+            try:
+                raw = client.chat(messages)
+                res["cached"] = res["cached"] and bool(getattr(client, "last_cached", False))
+            except LLMError as e:
+                res["error"], res["cached"] = str(e), False
+                break
+            res["raw"] = raw
+            parsed, salvaged = parse_json_response(raw), False
+            if parsed is None:
+                parsed = salvage_triples(raw)
+                salvaged = parsed is not None
+            if isinstance(parsed, dict) and isinstance(parsed.get("triples"), list):
+                triples, stats = validate_triples(parsed, self.ontology, self.standardizer)
+                cand = {"obj": parsed, "triples": triples, "stats": stats, "salvaged": salvaged}
+                if triples or stats["n_raw"] == 0 or not self.schema_retry:
+                    res.update(cand, usable=True, error=None)
+                    if salvaged:
+                        res["reasons"].append("truncated_json_salvaged")
+                    return res
+                # the model answered, but nothing fits the ontology -> schema-specific retry
+                res["reasons"].append("off_schema")
+                best = best or cand
+                feedback = schema_retry_message(self.ontology, stats["problems"])
+            elif parsed is not None:
+                res["reasons"].append("missing_triples_key")
+                if isinstance(parsed, list):   # a bare list of triples: usable if retries do not fix it
+                    triples, stats = validate_triples(parsed, self.ontology, self.standardizer)
+                    best = best or {"obj": parsed, "triples": triples, "stats": stats, "salvaged": False}
+                feedback = RETRY_WRAPPER_MESSAGE
+            else:
+                res["reasons"].append("invalid_json")
+                feedback = RETRY_MESSAGE
+            messages = messages + [{"role": "assistant", "content": (raw or "")[:1500]},
+                                   {"role": "user", "content": feedback}]
+        if best is not None:
+            res.update(best, usable=bool(best["triples"]), error=None)
+        return res
 
     def extract(self, call_id: str, text: str) -> ExtractionRecord:
         messages = build_extraction_messages(truncate_transcript(text, self.max_chars), self.ontology,
                                              self.prompt_version)
         t0 = time.time()
-        raw, obj, error, attempts, cached = None, None, None, 0, True
-        while attempts <= self.max_retries:
-            attempts += 1
-            try:
-                raw = self.client.chat(messages)
-                cached = cached and bool(getattr(self.client, "last_cached", False))
-            except LLMError as e:
-                error = str(e)
-                cached = False
-                break
-            parsed = parse_json_response(raw)
-            if isinstance(parsed, dict) and isinstance(parsed.get("triples"), list):
-                obj = parsed
-                break
-            if isinstance(parsed, list) and attempts > self.max_retries:
-                obj = parsed
-                break
-            messages = messages + [{"role": "assistant", "content": (raw or "")[:1500]},
-                                   {"role": "user", "content": RETRY_MESSAGE}]
-        json_valid = obj is not None
-        triples, stats = validate_triples(obj, self.ontology, self.standardizer) if json_valid else ([], {
-            "n_raw": 0, "n_dropped": 0, "n_repaired": 0, "conformant": False})
+        res = self._run_model(self.client, messages)
+        model_used, fallback_used = self.client.model, False
+        attempts, reasons = res["attempts"], list(res["reasons"])
+        if not res["usable"] and self.fallback_client is not None:
+            reasons.append("fallback_model")
+            fb = self._run_model(self.fallback_client, messages)
+            attempts += fb["attempts"]
+            reasons += fb["reasons"]
+            if fb["usable"] or (res["obj"] is None and fb["obj"] is not None):
+                res, model_used, fallback_used = fb, self.fallback_client.model, True
+        obj, stats = res["obj"], res["stats"] or {"n_raw": 0, "n_dropped": 0, "n_repaired": 0, "conformant": False}
+        triples = res["triples"]
         n_ungrounded = 0
         if self.grounding:
             triples, n_ungrounded = ground_triples(triples, text)
+        if obj is None:
+            status = "failed"
+        elif fallback_used:
+            status = "fallback"
+        elif res["salvaged"]:
+            status = "salvaged"
+        elif res["attempts"] > 1:
+            status = "retried"
+        elif stats["n_repaired"]:
+            status = "repaired"
+        elif not triples:
+            status = "empty"
+        else:
+            status = "ok"
+        json_valid = obj is not None and not res["salvaged"]
         return ExtractionRecord(
             call_id=call_id, extractor=self.name, triples=triples, json_valid=json_valid,
             schema_conformant=json_valid and stats["conformant"], attempts=attempts, n_raw=stats["n_raw"],
             n_dropped=stats["n_dropped"], n_repaired=stats["n_repaired"], n_ungrounded=n_ungrounded,
-            latency_s=round(time.time() - t0, 3), cached=cached, error=error, raw_response=(raw or "")[:4000])
+            latency_s=round(time.time() - t0, 3), cached=res["cached"], error=res["error"] if obj is None else None,
+            raw_response=(res["raw"] or "")[:4000], status=status, retry_reasons=reasons,
+            salvaged=res["salvaged"], fallback_used=fallback_used, model_used=model_used)
 
     def metadata(self) -> dict:
         return {"extractor": "llm", **self.client.describe(), "prompt_version": self.prompt_version,
                 "prompt_hash": prompt_fingerprint(self.ontology, self.prompt_version),
                 "ontology_version": self.ontology.version, "ontology_hash": self.ontology.fingerprint,
-                "max_retries": self.max_retries, "max_chars": self.max_chars, "grounding": self.grounding}
+                "max_retries": self.max_retries, "max_chars": self.max_chars, "grounding": self.grounding,
+                "schema_retry": self.schema_retry,
+                "fallback_model": self.fallback_client.model if self.fallback_client is not None else None}
 
 
 def make_extractor(kind: str, cfg: dict, ontology: Ontology, cache_dir: Path | None = None,
@@ -293,14 +431,30 @@ def make_extractor(kind: str, cfg: dict, ontology: Ontology, cache_dir: Path | N
         from scamkg.extraction.llm_client import make_client
         client = make_client(cfg, cache_dir=cache_dir, model=model, provider=provider)
         llm = cfg["llm"]
+        fallback = None
+        fb_model = llm.get("fallback_model")
+        if fb_model and fb_model != client.model:
+            fallback = make_client(cfg, cache_dir=cache_dir, model=fb_model,
+                                   provider=llm.get("fallback_provider") or provider)
         return LLMExtractor(client, ontology, standardizer, prompt_version or llm.get("prompt_version", "v1_full"),
                             int(llm.get("max_retries", 2)), int(llm.get("max_chars", 6000)),
-                            grounding=bool(llm.get("grounding", True)))
+                            grounding=bool(llm.get("grounding", True)), fallback_client=fallback,
+                            schema_retry=bool(llm.get("schema_retry", True)))
     raise ValueError(f"Unknown extractor {kind!r} (use 'rule' or 'llm')")
 
 
 # ---------------------------------------------------------------------------- running + IO
+def latest_records(records: list[dict]) -> list[dict]:
+    """One record per call: the last one written (a resumed run appends retries of failed calls)."""
+    return list({r["call_id"]: r for r in records}.values())
+
+
+def _is_failed(r: dict) -> bool:
+    return r.get("status") == "failed" or (bool(r.get("error")) and not r.get("triples"))
+
+
 def summarize_records(records: list[dict]) -> dict:
+    records = latest_records(records)
     n = len(records)
     if n == 0:
         return {"n_calls": 0}
@@ -323,6 +477,12 @@ def summarize_records(records: list[dict]) -> dict:
         "ungrounded_rate": (sum(r.get("n_ungrounded", 0) for r in records) / n_raw) if n_raw else 0.0,
         "inferred_rate": (sum(bool(t.get("inferred")) for t in triples) / len(triples)) if triples else 0.0,
         "mean_latency_s": sum(r.get("latency_s", 0.0) for r in records) / n,
+        # CHANGE (TA comment 1): how often each fallback layer was needed
+        "retry_rate": sum(r.get("attempts", 1) > 1 for r in records) / n,
+        "salvage_rate": sum(bool(r.get("salvaged")) for r in records) / n,
+        "fallback_rate": sum(bool(r.get("fallback_used")) for r in records) / n,
+        "failed_rate": sum(_is_failed(r) for r in records) / n,
+        "status_counts": pd.Series([r.get("status", "ok") for r in records]).value_counts().to_dict(),
         "triples_per_relation": per_rel,
     }
 
@@ -346,7 +506,9 @@ def run_extraction(calls: pd.DataFrame, extractor: BaseExtractor, out_dir: Path,
             resume = False
     if out_path.exists() and not resume:
         out_path.unlink()
-    done = {r["call_id"] for r in read_jsonl(out_path)} if resume else set()
+    # CHANGE: calls whose last record failed (timeout, server down, nothing usable) are retried on resume.
+    # Before, any written record counted as done, so one Ollama timeout lost that call for good.
+    done = {r["call_id"] for r in latest_records(read_jsonl(out_path)) if not _is_failed(r)} if resume else set()
     todo = [(cid, text) for cid, text in calls["text"].items() if cid not in done]
     if limit is not None:
         todo = todo[:limit]
@@ -373,12 +535,13 @@ def run_extraction(calls: pd.DataFrame, extractor: BaseExtractor, out_dir: Path,
         else:
             for it in tqdm(todo, desc=f"extract[{run_name}]", disable=len(todo) < 20):
                 work(it)
-    records = read_jsonl(out_path)
+    records = latest_records(read_jsonl(out_path))
     meta = {**extractor.metadata(), "run_name": run_name, "updated": timestamp(), **summarize_records(records)}
     save_json(out_path.with_suffix(".meta.json"), meta)
-    log.info("Run %s: %d calls, JSON validity %.3f, schema conformance %.3f, %.2f triples/call", run_name,
-             meta["n_calls"], meta.get("json_validity_rate", 0), meta.get("schema_conformance_rate", 0),
-             meta.get("mean_triples_per_call", 0))
+    log.info("Run %s: %d calls, JSON validity %.3f, schema conformance %.3f, %.2f triples/call | retried %.3f, "
+             "salvaged %.3f, fallback %.3f, failed %.3f", run_name, meta["n_calls"], meta.get("json_validity_rate", 0),
+             meta.get("schema_conformance_rate", 0), meta.get("mean_triples_per_call", 0), meta.get("retry_rate", 0),
+             meta.get("salvage_rate", 0), meta.get("fallback_rate", 0), meta.get("failed_rate", 0))
     return out_path
 
 
@@ -388,8 +551,7 @@ def list_runs(extractions_dir: Path) -> list[Path]:
 
 
 def _n_records(path: Path) -> int:
-    with path.open(encoding="utf-8") as f:
-        return sum(1 for line in f if line.strip())
+    return len(latest_records(read_jsonl(path)))
 
 
 def resolve_run(extractions_dir: Path, run: str | None = None) -> Path:

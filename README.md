@@ -35,7 +35,7 @@ flowchart LR
 | E1 TF-IDF + LR / SVM / RF / XGBoost | `train --experiments E1` | `scamkg/models/classical.py` |
 | E2 E1 + graph features + one-hot ontology entities (and E2G: KG features only) | `train --experiments E2 E2G` | `scamkg/models/classical.py` |
 | E3 fine-tuned DistilBERT, Sentence-BERT + MLP | `train --experiments E3` | `scamkg/models/transformer.py` |
-| E4 GraphSAGE (2 layers, mean aggr., 64 hidden, dropout 0.3, Adam); end-to-end and as XGBoost embedding generator | `train --experiments E4` | `scamkg/models/gnn.py` |
+| E4 GraphSAGE (2 layers, mean aggr., 64 hidden, dropout 0.3, Adam) on fused text + topology node features, inductive training; end-to-end, as XGBoost embedding generator, and text / topology block ablation | `train --experiments E4` | `scamkg/models/gnn.py` |
 | E5 K-Means / DBSCAN, purity, NMI, script signatures | `cluster` | `scamkg/models/clustering.py` |
 | LLM zero-shot reference | `zeroshot` | `scamkg/models/llm_zeroshot.py` |
 | X1 extraction quality (2 annotators x 50 calls; triple P/R, entity-type accuracy, JSON validity, schema conformance) | `annotate-sample`, `eval-extraction` | `scamkg/extraction/evaluate.py` |
@@ -122,15 +122,21 @@ Outputs go to `data/demo/`, `results/demo/` (see `results/demo/REPORT.md`) and `
    ```
 
 3. **Full extraction**, comparing two LLMs, a prompt ablation, and the rule-based baseline. Runs resume
-   after interruption, every response is cached in `data/cache/llm/`, and each run records model,
-   prompt version + hash, seed and temperature in `<run>.meta.json`.
+   after interruption (calls that failed are retried), every response is cached in `data/cache/llm/`,
+   and each run records model, prompt version + hash, seed, temperature and fallback statistics in
+   `<run>.meta.json`. The main run uses the fallback model (`llm.fallback_model`, run name ends in
+   `_fb-gemma2-9b`); the comparison runs use `--no-fallback` so each run measures one model only.
 
    ```bash
-   .venv\Scripts\python -m scamkg extract --extractor llm --model qwen2.5:7b gemma2:9b
+   .venv\Scripts\python -m scamkg extract --extractor llm --model qwen2.5:7b
    ```
 
    ```bash
-   .venv\Scripts\python -m scamkg extract --extractor llm --model qwen2.5:7b --prompt-version v2_no_descriptors v3_no_example v0_open --splits test
+   .venv\Scripts\python -m scamkg extract --extractor llm --model qwen2.5:7b gemma2:9b --no-fallback
+   ```
+
+   ```bash
+   .venv\Scripts\python -m scamkg extract --extractor llm --model qwen2.5:7b --prompt-version v2_no_descriptors v3_no_example v0_open --splits test --no-fallback
    ```
 
    ```bash
@@ -153,7 +159,7 @@ Outputs go to `data/demo/`, `results/demo/` (see `results/demo/REPORT.md`) and `
    with full coverage (pilot runs are never picked silently), or pass `--run <name>`.
 
    ```bash
-   .venv\Scripts\python -m scamkg build-graph --run llm_ollama_qwen2.5-7b_v1_full
+   .venv\Scripts\python -m scamkg build-graph --run llm_ollama_qwen2.5-7b_v1_full_fb-gemma2-9b
    ```
 
    With Neo4j + Graph Data Science instead of networkx (see below):
@@ -214,6 +220,47 @@ Score any new transcript with a trained model and get its KG explanation:
 .venv\Scripts\python -m scamkg predict --text "caller: This is the IRS, pay today with gift cards or you will be arrested."
 ```
 
+## Extraction fallback logic (TA feedback 1)
+
+`LLMExtractor` (`scamkg/extraction/extractor.py`) handles bad LLM output in layers; every call's
+`status`, `attempts`, `retry_reasons`, `salvaged`, `fallback_used` and `model_used` are stored, and
+`eval-extraction` reports `retry_rate`, `salvage_rate`, `fallback_rate` and `failed_rate` per run.
+
+| Problem | What happens |
+|---|---|
+| Prose / markdown around the JSON | code fences and text are stripped, the outermost `{...}` is parsed |
+| Answer cut off at the token cap | `salvage_triples` keeps every complete triple object (status `salvaged`) |
+| Not JSON at all | retry with "return only the JSON object" |
+| JSON without a `triples` list | retry with the expected wrapper; a bare list is still used if retries fail |
+| A triple misses `relation` | relation repaired from `object_type` when possible, else the triple is dropped |
+| A triple misses `object` | triple dropped (reason logged) |
+| Unknown relation / wrong object type | repaired from the object type, or re-typed when the value belongs to another vocabulary |
+| Value outside a closed vocabulary | standardised via synonyms (`ontology.yaml`), else dropped |
+| Every triple off-schema | retry with the allowed relations and the list of what was wrong (`schema_retry`) |
+| Still nothing usable, or the request failed | same loop once with `llm.fallback_model` (status `fallback`) |
+| Triple not supported by the transcript | dropped by the grounding check (e.g. copied from the few-shot example) |
+| Everything failed | status `failed`, no triples: the call stays a Call node with zero graph features and is retried on the next `extract` resume |
+
+An honest `{"triples": []}` is accepted without retry, because legitimate calls often state no facts.
+
+## GraphSAGE feature fusion (TA feedback 2)
+
+Every node gets three feature blocks (`scamkg/models/gnn.py`): the **text** block (SBERT transcript
+embedding for calls, value + descriptor embedding for entities), the **topology** block (label-free
+`het_degree`, `het_pagerank`, `het_betweenness`, `cc_degree`, `cc_weighted_degree`, `cc_pagerank`,
+`community_size`, entity popularity, relation counts; entity degree / PageRank for entity nodes;
+log1p + standardised on training calls) and the node **type** one-hot. Each block is projected
+separately so the 384-d text block cannot drown out the ~19 topology features, then fused before any
+neighbour aggregation:
+
+```
+h_v(0) = LayerNorm([ReLU(W_t s_v) (64) || ReLU(W_g g_v) (16) || W_o o_v (8)])
+h_v(k) = ReLU(W_self h_v(k-1) + W_neigh * mean_{u in N(v)} h_u(k-1)),  k = 1, 2
+```
+
+`models.graphsage.variants` trains `text+topo` (reported as `graphsage`), `text` and `topo`, which is
+the block ablation; `results/graphsage_fusion.json` lists the exact inputs.
+
 ## Neo4j
 
 ```bash
@@ -266,8 +313,11 @@ The dump lands in `neo4j/dumps/`. Without Docker, any Neo4j 5 server with the GD
 * Graph structure (PageRank, degree, betweenness, Louvain, Jaccard) is label-free.
 * Every label-derived feature (community scam rate, similarity to known scams, k-NN scam rate, entity
   risk) is rebuilt for each training set from **training labels only** (train for tuning, train+val for
-  the final model, the fold's train part in CV), with leave-one-out values for training calls
-  (`tests/test_features.py`).
+  the final model, the fold's train part in CV), with 5-fold **out-of-fold** values for training calls
+  (`graph.label_encoding: oof`; leave-one-out made tree models learn a label artefact, see
+  `GraphFeatureBuilder.build`) (`tests/test_features.py`).
+* GraphSAGE trains inductively: the loss graph has no validation / test / external calls, early
+  stopping uses train + validation calls, and only final scoring uses the full graph.
 * Hyper-parameters are tuned by randomized search on the validation split only.
 * LLM extraction: temperature 0.1, fixed seed, capped output length, JSON validation with retry, schema
   repair, entity standardization, and a grounding check that drops triples whose evidence/mention is not
@@ -311,7 +361,11 @@ tests/           pytest suite (runs offline on synthetic data)
 
 * The NCSU robocall set contains only illegal robocalls (label 1), so only recall is defined on it alone;
   the `ncsu+kaggle` evaluation set pairs its calls with Kaggle's legitimate calls for PR-AUC.
-* `data.sources.kaggle.slug` is left empty because the proposal does not name the Kaggle owner; set it
-  once the team fixes the exact data set.
+* `data.sources.kaggle.slug` is set to `teeconnie/scam-and-non-scam-call-conversation-dataset`
+  (proposal reference [18]); the Kaggle CLI needs `~/.kaggle/kaggle.json`, otherwise put the CSV in
+  `data/raw/kaggle/`. Check the column names after the first `preprocess` and set `text_col` /
+  `label_col` if the auto-detection picks the wrong ones.
+* Zero-shot answers that fail (no JSON, request error) are scored 0.0 ("no alert") and counted in
+  `valid_rate`; they used to be scored 0.5, which the 0.5 threshold counted as a scam detection.
 * Small local models (e.g. `qwen2.5:0.5b`) produce valid JSON but noisy, sometimes copied triples; use
   7B+ models (or Voyager) for the real extraction runs.

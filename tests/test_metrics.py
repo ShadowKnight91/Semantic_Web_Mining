@@ -1,3 +1,4 @@
+import pytest
 import numpy as np
 
 from scamkg.evaluation.evaluator import imbalanced_draws
@@ -38,3 +39,20 @@ def test_imbalanced_draws_rate():
     for d in draws:
         pos = sum(1 for c in d if int(c[1:]) < 100)
         assert len(d) == 105 and pos == 5
+
+
+def test_zeroshot_answer_parsing():
+    from scamkg.models.llm_zeroshot import NO_ANSWER_SCORE, classify
+
+    class C:
+        def __init__(self, r):
+            self.r = r
+
+        def chat(self, messages):
+            return self.r
+
+    assert classify(C('{"label": "scam", "scam_probability": 0.8}'), "x")["scam_probability"] == 0.8
+    assert classify(C('{"label": "legitimate", "confidence": 0.9}'), "x")["scam_probability"] == pytest.approx(0.1)
+    assert classify(C('{"label": "scam", "confidence": 0.3}'), "x")["scam_probability"] == pytest.approx(0.7)
+    bad = classify(C("I cannot answer that"), "x")
+    assert not bad["valid"] and bad["scam_probability"] == NO_ANSWER_SCORE < 0.5

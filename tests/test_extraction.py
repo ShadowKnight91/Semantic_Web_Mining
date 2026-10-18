@@ -103,3 +103,86 @@ def test_llm_extractor_gives_up(ontology):
     client = FakeClient(["nope", "still nope", "no"])
     rec = LLMExtractor(client, ontology, max_retries=2).extract("c1", "caller: hi")
     assert not rec.json_valid and rec.triples == [] and rec.attempts == 3
+
+
+# ---------------------------------------------------------------- fallback / retry logic (TA comment 1)
+def test_salvages_truncated_json(ontology):
+    """Answer cut off at the token cap: the complete triples are kept, the unfinished one is dropped."""
+    cut = ('{"triples": [{"relation": "PAY_VIA", "object_type": "PaymentChannel", "object": "gift_card", '
+           '"evidence": "pay with gift cards"}, {"relation": "REQUESTS", "object_type": "RequestedAs')
+    rec = LLMExtractor(FakeClient([cut]), ontology, max_retries=0).extract("c1", "caller: pay with gift cards now")
+    assert rec.status == "salvaged" and rec.salvaged and not rec.json_valid
+    assert _pairs(rec.triples) == {("PAY_VIA", "gift_card")}
+
+
+def test_retries_when_every_triple_is_off_schema(ontology):
+    """Valid JSON whose triples all miss the ontology -> schema-specific retry, not silent loss."""
+    bad = json.dumps({"triples": [{"predicate": "LIKES", "value": "pizza"}, {"relation": "EATS", "object": "cake"}]})
+    good = json.dumps({"triples": [{"relation": "PAY_VIA", "object_type": "PaymentChannel", "object": "Zelle"}]})
+    client = FakeClient([bad, good])
+    seen = []
+    orig = client.chat
+    client.chat = lambda m: (seen.append(m[-1]["content"]), orig(m))[1]
+    rec = LLMExtractor(client, ontology, max_retries=2).extract("c1", "caller: send it by Zelle")
+    assert client.calls == 2 and rec.status == "retried" and "off_schema" in rec.retry_reasons
+    assert "PAY_VIA -> PaymentChannel" in seen[-1] and "unknown relation" in seen[-1]
+    assert _pairs(rec.triples) == {("PAY_VIA", "zelle")}
+
+
+def test_honest_empty_answer_is_not_retried(ontology):
+    client = FakeClient([json.dumps({"triples": []})])
+    rec = LLMExtractor(client, ontology, max_retries=2).extract("c1", "caller: see you at dinner")
+    assert client.calls == 1 and rec.status == "empty" and rec.json_valid
+
+
+def test_fallback_model_after_primary_fails(ontology):
+    good = json.dumps({"triples": [{"relation": "REQUESTS", "object_type": "RequestedAsset", "object": "otp",
+                                    "evidence": "read me the code"}]})
+    primary = FakeClient(["nope", "still nope", "no"])
+    fallback = FakeClient([good])
+    fallback.model = "fallback-llm"
+    rec = LLMExtractor(primary, ontology, max_retries=2, fallback_client=fallback).extract(
+        "c1", "caller: read me the code we sent you")
+    assert rec.status == "fallback" and rec.fallback_used and rec.model_used == "fallback-llm"
+    assert rec.attempts == 4 and _pairs(rec.triples) == {("REQUESTS", "otp")}
+
+
+def test_failed_calls_are_retried_on_resume(ontology, tmp_path):
+    import pandas as pd
+    from scamkg.extraction.extractor import read_jsonl, run_extraction
+    from scamkg.extraction.llm_client import LLMError
+
+    class Flaky(FakeClient):
+        def chat(self, messages):
+            self.calls += 1
+            if self.calls == 1:
+                raise LLMError("timed out")
+            return json.dumps({"triples": []})
+
+    calls = pd.DataFrame({"text": ["caller: hello there friend", "caller: good morning to you"]}, index=["a", "b"])
+    ex = LLMExtractor(Flaky([]), ontology, max_retries=0)
+    out = run_extraction(calls, ex, tmp_path, run_name="r", resume=True)
+    first = {r["call_id"]: r["status"] for r in read_jsonl(out)}
+    assert first == {"a": "failed", "b": "empty"}
+    run_extraction(calls, ex, tmp_path, run_name="r", resume=True)       # only "a" is redone
+    from scamkg.extraction.extractor import latest_records, summarize_records
+    recs = latest_records(read_jsonl(out))
+    assert {r["call_id"]: r["status"] for r in recs} == {"a": "empty", "b": "empty"}
+    assert summarize_records(read_jsonl(out))["n_calls"] == 2
+
+
+def test_annotated_empty_calls_count_in_gold(ontology, tmp_path):
+    """A call annotated as fact-free must stay in the gold set, so extra predicted triples are false positives."""
+    from scamkg.extraction.evaluate import compare_to_gold, load_annotations
+    from scamkg.utils import write_jsonl
+    path = tmp_path / "annotator_A.jsonl"
+    write_jsonl(path, [
+        {"call_id": "a", "annotated": True, "triples": []},
+        {"call_id": "b", "triples": [{"relation": "PAY_VIA", "object": "gift_card"}]},
+        {"call_id": "c", "annotated": False, "triples": []},              # not done yet -> skipped
+    ])
+    gold = load_annotations(path, ontology, EntityStandardizer(ontology))
+    assert set(gold) == {"a", "b"} and gold["a"] == []
+    pred = {"a": [{"relation": "REQUESTS", "object": "otp", "object_type": "RequestedAsset"}],
+            "b": [{"relation": "PAY_VIA", "object": "gift_card", "object_type": "PaymentChannel"}]}
+    assert compare_to_gold(pred, gold)["triple_precision"] == 0.5

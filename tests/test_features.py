@@ -87,3 +87,17 @@ def test_onehot_matrix_alignment(demo_ctx):
         ents = set(demo_ctx.kg.entities_of(cid))
         for c, n in enumerate(names[:-1]):
             assert M[r, c] == (1.0 if n in ents else 0.0)
+
+
+def test_oof_training_features_ignore_own_label(demo_ctx):
+    """With out-of-fold encoding a training call's label-based features never use its own label."""
+    from scamkg.graph.features import LABEL_BASED
+    ctx = demo_ctx
+    labeled = ctx.train_ids
+    y = ctx.labels(labeled).copy()
+    base = ctx.fb.build(labeled, y)
+    target = labeled[3]
+    y2 = y.copy()
+    y2[3] = 1 - y2[3]
+    again = ctx.fb.build(labeled, y2)
+    pd.testing.assert_series_equal(base.loc[target, LABEL_BASED], again.loc[target, LABEL_BASED])
