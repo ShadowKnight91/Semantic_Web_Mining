@@ -1,0 +1,17 @@
+# Real data on a laptop without ASU Voyager: the rule-based knowledge graph and a local Ollama model.
+# The default config builds the graph from the committed Gemma run, whose new calls must be extracted with
+# Gemma on Voyager; with this file every command (and the dashboard's live scoring) uses the `rule` run.
+#   python -m scamkg --config config/local.yaml build-graph --backend neo4j
+#   python -m scamkg --config config/local.yaml train
+#   python -m scamkg --config config/local.yaml dashboard
+#   python -m scamkg --config config/local.yaml predict --text "..."
+# `predict --extractor llm` extracts the new call with llm.model (start Ollama first); the KG itself stays
+# rule-based, so predict warns that the two are not comparable.
+extraction:
+  default_run: rule
+
+llm:
+  provider: ollama
+  model: qwen2.5:7b
+  compare_models: [qwen2.5:7b, gemma2:9b]
+  fallback_model: gemma2:9b

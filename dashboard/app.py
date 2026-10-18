@@ -20,7 +20,8 @@ from scamkg.utils import read_jsonl  # noqa: E402
 EXAMPLE = ("caller: This is Officer Brown from the Social Security Administration. Your SSN has been suspended due "
            "to suspicious activity. To avoid arrest today, you must verify your number and pay a fine using Google "
            "Play gift cards.\nreceiver: Oh no, what do I need to do?")
-CONFIGS = {"real data (config/config.yaml)": None, "synthetic demo (config/demo.yaml)": "config/demo.yaml"}
+CONFIGS = {"real data (config/config.yaml)": None, "real data, rule KG + Ollama (config/local.yaml)": "config/local.yaml",
+           "synthetic demo (config/demo.yaml)": "config/demo.yaml"}
 
 st.set_page_config(page_title="ScamKG - phone scam detection", layout="wide")
 

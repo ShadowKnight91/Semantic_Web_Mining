@@ -237,6 +237,14 @@ Score any new transcript with a trained model and get its KG explanation:
 .venv\Scripts\python -m scamkg predict --text "caller: This is the IRS, pay today with gift cards or you will be arrested."
 ```
 
+**Without Voyager access.** The default graph is the Gemma run, so scoring a new call needs Gemma on
+Voyager to extract its triples. `config/local.yaml` switches every command to the rule-based graph and a
+local Ollama model instead (build the graph and train once with it, then demo):
+
+```bash
+.venv\Scripts\python -m scamkg --config config/local.yaml dashboard
+```
+
 ## Extraction fallback logic (TA feedback 1)
 
 `LLMExtractor` (`scamkg/extraction/extractor.py`) handles bad LLM output in layers; every call's
