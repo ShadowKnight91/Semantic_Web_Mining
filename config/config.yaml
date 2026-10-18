@@ -124,3 +124,22 @@ models:
     seeds: [42]
   sbert:
     model_name: sentence-transformers/all-MiniLM-L6-v2
+    chunk_words: 180
+    mlp_hidden: [256]
+  graphsage:
+    hidden: 64
+    dropout: 0.3
+    lr: 0.01
+    weight_decay: 5.0e-4
+    epochs: 300
+    patience: 30
+    node_features: sbert           # sbert | tfidf_svd (text block)
+    use_similarity_edges: false
+    inductive: true                # loss graph holds training calls only; test / external calls join at scoring
+    variants: [text+topo, text, topo]   # text+topo is reported as `graphsage`; the others are the block ablation
+    fusion: {text_dim: 64, topo_dim: 16, type_dim: 8}   # per-block projection sizes before LayerNorm
+  clustering:
+    k_min: 2
+    k_max: 12
+    pca_dim: 20
+    dbscan_min_samples: 5

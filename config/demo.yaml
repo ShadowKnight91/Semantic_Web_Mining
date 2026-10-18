@@ -27,3 +27,6 @@ models:
 
 graph:
   betweenness_samples: 100
+
+extraction:
+  default_run: null               # the synthetic data has no Gemma run; use the run just extracted

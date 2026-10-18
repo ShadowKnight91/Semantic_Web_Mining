@@ -26,6 +26,7 @@ def demo_cfg(tmp_path_factory):
                  "mixed_external": [["demo_robocall", "demo_shifted"]], "imbalanced_test": {"n_draws": 5}},
         "models": {"search_iter": 2, "classical": ["lr", "xgb"], "cv_folds": 3},
         "graph": {"betweenness_samples": 50},
+        "extraction": {"default_run": None},   # the synthetic data has no Gemma run
     }
     cfg = load_config(overrides=overrides)
     from scamkg.config import get_paths
