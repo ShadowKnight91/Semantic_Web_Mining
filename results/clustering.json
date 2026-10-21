@@ -1,0 +1,522 @@
+{
+  "n_calls": 1598,
+  "kmeans_sweep": [
+    {
+      "k": 2,
+      "silhouette": 0.22773233974938384,
+      "inertia": 35295.36756932726,
+      "purity": 0.7509386733416771,
+      "nmi": 0.3450728755829719,
+      "ari": 0.2515284878097798,
+      "n_clusters": 2,
+      "noise_frac": 0.0
+    },
+    {
+      "k": 3,
+      "silhouette": 0.21149144672124076,
+      "inertia": 30891.656879951006,
+      "purity": 0.7684605757196495,
+      "nmi": 0.4039384995543821,
+      "ari": 0.2564856549046979,
+      "n_clusters": 3,
+      "noise_frac": 0.0
+    },
+    {
+      "k": 4,
+      "silhouette": 0.24311987273660646,
+      "inertia": 27028.383597920274,
+      "purity": 0.7653316645807259,
+      "nmi": 0.38232275560211193,
+      "ari": 0.22249104169603437,
+      "n_clusters": 4,
+      "noise_frac": 0.0
+    },
+    {
+      "k": 5,
+      "silhouette": 0.27427569778903604,
+      "inertia": 24237.782111103726,
+      "purity": 0.7640801001251565,
+      "nmi": 0.347802110504926,
+      "ari": 0.15128533056174642,
+      "n_clusters": 5,
+      "noise_frac": 0.0
+    },
+    {
+      "k": 6,
+      "silhouette": 0.2936013649829149,
+      "inertia": 21508.76128699925,
+      "purity": 0.9824780976220275,
+      "nmi": 0.5152672223752451,
+      "ari": 0.350753844806156,
+      "n_clusters": 6,
+      "noise_frac": 0.0
+    },
+    {
+      "k": 7,
+      "silhouette": 0.29825841221526433,
+      "inertia": 19930.656951055556,
+      "purity": 0.9887359198998749,
+      "nmi": 0.5016226909894973,
+      "ari": 0.3083714400466388,
+      "n_clusters": 7,
+      "noise_frac": 0.0
+    },
+    {
+      "k": 8,
+      "silhouette": 0.30917835652727926,
+      "inertia": 18547.51001575016,
+      "purity": 0.9849812265331664,
+      "nmi": 0.47301906401626803,
+      "ari": 0.27850477491148357,
+      "n_clusters": 8,
+      "noise_frac": 0.0
+    },
+    {
+      "k": 9,
+      "silhouette": 0.3154432624294412,
+      "inertia": 17785.054106996224,
+      "purity": 0.9818523153942428,
+      "nmi": 0.4514164553328149,
+      "ari": 0.24441948967010016,
+      "n_clusters": 9,
+      "noise_frac": 0.0
+    },
+    {
+      "k": 10,
+      "silhouette": 0.32204570792793463,
+      "inertia": 16577.556081912247,
+      "purity": 0.981226533166458,
+      "nmi": 0.43855630148586683,
+      "ari": 0.23400370101624457,
+      "n_clusters": 10,
+      "noise_frac": 0.0
+    },
+    {
+      "k": 11,
+      "silhouette": 0.3258675745691358,
+      "inertia": 15643.277369929598,
+      "purity": 0.9856070087609512,
+      "nmi": 0.44785657635401316,
+      "ari": 0.23456213362451647,
+      "n_clusters": 11,
+      "noise_frac": 0.0
+    },
+    {
+      "k": 12,
+      "silhouette": 0.31336168281312965,
+      "inertia": 15204.879154967652,
+      "purity": 0.9831038798498123,
+      "nmi": 0.430983492723854,
+      "ari": 0.22464478998263832,
+      "n_clusters": 12,
+      "noise_frac": 0.0
+    }
+  ],
+  "kmeans_best": {
+    "k": 11,
+    "purity": 0.9856070087609512,
+    "nmi": 0.44785657635401316,
+    "ari": 0.23456213362451647,
+    "n_clusters": 11,
+    "noise_frac": 0.0,
+    "nmi_vs_subtype": 0.758053287790374
+  },
+  "kmeans_k2": {
+    "k": 2,
+    "purity": 0.7509386733416771,
+    "nmi": 0.3450728755829719,
+    "ari": 0.2515284878097798,
+    "n_clusters": 2,
+    "noise_frac": 0.0
+  },
+  "dbscan": {
+    "eps": 0.9998752844368475,
+    "eps_percentile": 50,
+    "silhouette": 0.7005312622083131,
+    "purity": 0.8635794743429287,
+    "nmi": 0.24011428562082113,
+    "ari": 0.08782813644741248,
+    "n_clusters": 63,
+    "noise_frac": 0.4593241551939925
+  },
+  "scripts": [
+    {
+      "cluster": 0,
+      "size": 291,
+      "scam_rate": 0.0,
+      "signature": "delivery_service",
+      "top_entities": [
+        {
+          "entity": "ClaimedIdentity::delivery_service",
+          "freq": 0.619,
+          "lift": 5.12
+        },
+        {
+          "entity": "Organization::XYZ Delivery Service",
+          "freq": 0.285,
+          "lift": 4.85
+        },
+        {
+          "entity": "RequestedAsset::personal_info",
+          "freq": 0.21,
+          "lift": 0.84
+        }
+      ],
+      "dominant_subtype": "delivery (63%)"
+    },
+    {
+      "cluster": 3,
+      "size": 228,
+      "scam_rate": 0.0,
+      "signature": "insurance -> reward+urgency",
+      "top_entities": [
+        {
+          "entity": "Organization::XYZ Insurance",
+          "freq": 0.211,
+          "lift": 6.87
+        },
+        {
+          "entity": "ClaimedIdentity::insurance",
+          "freq": 1.0,
+          "lift": 6.63
+        },
+        {
+          "entity": "Organization::XYZ Insurance Company",
+          "freq": 0.272,
+          "lift": 6.58
+        },
+        {
+          "entity": "Organization::Safeguard Insurance",
+          "freq": 0.254,
+          "lift": 6.56
+        },
+        {
+          "entity": "Organization::Better Business Bureau",
+          "freq": 0.654,
+          "lift": 4.77
+        },
+        {
+          "entity": "PressureTactic::reward",
+          "freq": 0.987,
+          "lift": 1.94
+        }
+      ],
+      "dominant_subtype": "insurance (83%)"
+    },
+    {
+      "cluster": 2,
+      "size": 199,
+      "scam_rate": 1.0,
+      "signature": "government_agent -> fear+urgency -> ssn",
+      "top_entities": [
+        {
+          "entity": "Organization::Social Security Administration",
+          "freq": 0.98,
+          "lift": 7.83
+        },
+        {
+          "entity": "ClaimedIdentity::government_agent",
+          "freq": 0.99,
+          "lift": 7.09
+        },
+        {
+          "entity": "PressureTactic::threat",
+          "freq": 0.734,
+          "lift": 5.83
+        },
+        {
+          "entity": "PressureTactic::secrecy",
+          "freq": 0.452,
+          "lift": 5.56
+        },
+        {
+          "entity": "RequestedAsset::ssn",
+          "freq": 0.995,
+          "lift": 5.03
+        },
+        {
+          "entity": "PressureTactic::fear",
+          "freq": 0.995,
+          "lift": 3.35
+        }
+      ],
+      "dominant_subtype": "ssn (98%)"
+    },
+    {
+      "cluster": 10,
+      "size": 189,
+      "scam_rate": 1.0,
+      "signature": "tech_support -> fear+urgency -> remote_access",
+      "top_entities": [
+        {
+          "entity": "Organization::Windows",
+          "freq": 0.265,
+          "lift": 7.98
+        },
+        {
+          "entity": "RequestedAsset::remote_access",
+          "freq": 0.921,
+          "lift": 7.25
+        },
+        {
+          "entity": "ClaimedIdentity::tech_support",
+          "freq": 1.0,
+          "lift": 7.1
+        },
+        {
+          "entity": "Organization::Microsoft",
+          "freq": 0.593,
+          "lift": 6.58
+        },
+        {
+          "entity": "PressureTactic::fear",
+          "freq": 0.963,
+          "lift": 3.24
+        },
+        {
+          "entity": "PressureTactic::urgency",
+          "freq": 0.577,
+          "lift": 1.7
+        }
+      ],
+      "dominant_subtype": "support (92%)"
+    },
+    {
+      "cluster": 4,
+      "size": 174,
+      "scam_rate": 0.9770114942528736,
+      "signature": "prize_or_lottery -> reward -> personal_info+ssn",
+      "top_entities": [
+        {
+          "entity": "ClaimedIdentity::prize_or_lottery",
+          "freq": 0.626,
+          "lift": 7.82
+        },
+        {
+          "entity": "Organization::Walmart",
+          "freq": 0.437,
+          "lift": 7.51
+        },
+        {
+          "entity": "RequestedAsset::personal_info",
+          "freq": 0.764,
+          "lift": 3.05
+        },
+        {
+          "entity": "RequestedAsset::ssn",
+          "freq": 0.466,
+          "lift": 2.35
+        },
+        {
+          "entity": "PressureTactic::reward",
+          "freq": 0.989,
+          "lift": 1.94
+        },
+        {
+          "entity": "PressureTactic::urgency",
+          "freq": 0.282,
+          "lift": 0.83
+        }
+      ],
+      "dominant_subtype": "reward (82%)"
+    },
+    {
+      "cluster": 7,
+      "size": 158,
+      "scam_rate": 1.0,
+      "signature": "retailer_customer_service -> reward+urgency -> personal_info+bank_account",
+      "top_entities": [
+        {
+          "entity": "ClaimedIdentity::retailer_customer_service",
+          "freq": 0.911,
+          "lift": 7.25
+        },
+        {
+          "entity": "Organization::Amazon",
+          "freq": 0.81,
+          "lift": 7.11
+        },
+        {
+          "entity": "RequestedAsset::bank_account",
+          "freq": 0.468,
+          "lift": 6.29
+        },
+        {
+          "entity": "RequestedAsset::card_number",
+          "freq": 0.316,
+          "lift": 5.11
+        },
+        {
+          "entity": "RequestedAsset::personal_info",
+          "freq": 0.506,
+          "lift": 2.02
+        },
+        {
+          "entity": "PressureTactic::reward",
+          "freq": 1.0,
+          "lift": 1.97
+        }
+      ],
+      "dominant_subtype": "refund (83%)"
+    },
+    {
+      "cluster": 9,
+      "size": 158,
+      "scam_rate": 0.0189873417721519,
+      "signature": "telemarketer_sales -> reward",
+      "top_entities": [
+        {
+          "entity": "Organization::XYZ Company",
+          "freq": 0.627,
+          "lift": 9.72
+        },
+        {
+          "entity": "ClaimedIdentity::telemarketer_sales",
+          "freq": 0.962,
+          "lift": 9.67
+        },
+        {
+          "entity": "Organization::Better Business Bureau",
+          "freq": 0.373,
+          "lift": 2.72
+        },
+        {
+          "entity": "RequestedAsset::money",
+          "freq": 0.272,
+          "lift": 2.25
+        },
+        {
+          "entity": "PressureTactic::reward",
+          "freq": 0.994,
+          "lift": 1.95
+        }
+      ],
+      "dominant_subtype": "telemarketing (97%)"
+    },
+    {
+      "cluster": 6,
+      "size": 100,
+      "scam_rate": 0.0,
+      "signature": "(no dominant entities)",
+      "top_entities": [],
+      "dominant_subtype": "wrong (96%)"
+    },
+    {
+      "cluster": 1,
+      "size": 65,
+      "scam_rate": 0.9076923076923077,
+      "signature": "retailer_customer_service -> reward+urgency -> money+personal_info -> credit_card_payment+gift_card",
+      "top_entities": [
+        {
+          "entity": "PaymentChannel::credit_card_payment",
+          "freq": 0.508,
+          "lift": 23.86
+        },
+        {
+          "entity": "PaymentChannel::wire_transfer",
+          "freq": 0.215,
+          "lift": 19.12
+        },
+        {
+          "entity": "PaymentChannel::gift_card",
+          "freq": 0.323,
+          "lift": 16.13
+        },
+        {
+          "entity": "RequestedAsset::money",
+          "freq": 0.785,
+          "lift": 6.5
+        },
+        {
+          "entity": "RequestedAsset::card_number",
+          "freq": 0.338,
+          "lift": 5.46
+        },
+        {
+          "entity": "ClaimedIdentity::prize_or_lottery",
+          "freq": 0.277,
+          "lift": 3.46
+        }
+      ],
+      "dominant_subtype": "reward (43%)"
+    },
+    {
+      "cluster": 8,
+      "size": 31,
+      "scam_rate": 0.6774193548387096,
+      "signature": "tech_support+delivery_service -> fear+urgency -> remote_access",
+      "top_entities": [
+        {
+          "entity": "Organization::Microsoft",
+          "freq": 0.613,
+          "lift": 6.8
+        },
+        {
+          "entity": "Organization::XYZ Delivery Service",
+          "freq": 0.323,
+          "lift": 5.48
+        },
+        {
+          "entity": "RequestedAsset::remote_access",
+          "freq": 0.613,
+          "lift": 4.82
+        },
+        {
+          "entity": "ClaimedIdentity::tech_support",
+          "freq": 0.613,
+          "lift": 4.35
+        },
+        {
+          "entity": "ClaimedIdentity::delivery_service",
+          "freq": 0.323,
+          "lift": 2.67
+        },
+        {
+          "entity": "PressureTactic::fear",
+          "freq": 0.677,
+          "lift": 2.28
+        }
+      ],
+      "dominant_subtype": "support (61%)"
+    },
+    {
+      "cluster": 5,
+      "size": 5,
+      "scam_rate": 0.0,
+      "signature": "relative_or_friend -> personal_info",
+      "top_entities": [
+        {
+          "entity": "RequestedAsset::other",
+          "freq": 0.2,
+          "lift": 53.27
+        },
+        {
+          "entity": "Organization::Dell",
+          "freq": 0.2,
+          "lift": 45.66
+        },
+        {
+          "entity": "ClaimedIdentity::relative_or_friend",
+          "freq": 0.6,
+          "lift": 19.57
+        },
+        {
+          "entity": "ClaimedIdentity::other",
+          "freq": 0.2,
+          "lift": 15.98
+        },
+        {
+          "entity": "Organization::Johns Pizza",
+          "freq": 0.2,
+          "lift": 11.84
+        },
+        {
+          "entity": "Organization::XYZ Delivery Service",
+          "freq": 0.2,
+          "lift": 3.4
+        }
+      ],
+      "dominant_subtype": "wrong (80%)"
+    }
+  ]
+}

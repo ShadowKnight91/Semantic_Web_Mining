@@ -1,0 +1,372 @@
+{
+  "runs": [
+    {
+      "run": "rule",
+      "model": "rule",
+      "prompt_version": "",
+      "n_calls": 3104,
+      "json_validity_rate": 1.0,
+      "schema_conformance_rate": 1.0,
+      "mean_triples_per_call": 2.6884664948453607,
+      "repaired_rate": 0.0,
+      "inferred_rate": 0.08076692630317556,
+      "retry_rate": 0.0,
+      "salvage_rate": 0.0,
+      "fallback_rate": 0.0,
+      "failed_rate": 0.0,
+      "mean_latency_s": 0.003009310567010309,
+      "triple_precision": 0.7727272727272727,
+      "triple_recall": 0.5891089108910891,
+      "triple_f1": 0.6685393258426967,
+      "macro_precision": 0.6739999999999999,
+      "macro_recall": 0.5424603174603174,
+      "entity_type_accuracy": 1.0,
+      "gold_calls": 50
+    },
+    {
+      "run": "llm_voyager_gemma4-31b-it_v1_full_fb-qwen3-30b-a3b",
+      "model": "gemma4-31b-it",
+      "prompt_version": "v1_full",
+      "n_calls": 3104,
+      "json_validity_rate": 1.0,
+      "schema_conformance_rate": 0.9835695876288659,
+      "mean_triples_per_call": 4.00805412371134,
+      "repaired_rate": 0.00031118717908822156,
+      "inferred_rate": 0.10819065991479784,
+      "retry_rate": 0.00032216494845360824,
+      "salvage_rate": 0.0,
+      "fallback_rate": 0.00032216494845360824,
+      "failed_rate": 0.0,
+      "mean_latency_s": 8.664423002577319,
+      "triple_precision": 0.8970588235294118,
+      "triple_recall": 0.905940594059406,
+      "triple_f1": 0.9014778325123153,
+      "macro_precision": 0.7942857142857142,
+      "macro_recall": 0.869984126984127,
+      "entity_type_accuracy": 1.0,
+      "gold_calls": 50
+    },
+    {
+      "run": "llm_voyager_qwen3-30b-a3b_v1_full",
+      "model": "qwen3-30b-a3b",
+      "prompt_version": "v1_full",
+      "n_calls": 287,
+      "json_validity_rate": 0.9825783972125436,
+      "schema_conformance_rate": 0.6167247386759582,
+      "mean_triples_per_call": 5.829268292682927,
+      "repaired_rate": 0.0032228360957642726,
+      "inferred_rate": 0.12910938433950986,
+      "retry_rate": 0.0,
+      "salvage_rate": 0.017421602787456445,
+      "fallback_rate": 0.0,
+      "failed_rate": 0.0,
+      "mean_latency_s": 10.19062369337979,
+      "triple_precision": 0.6167883211678832,
+      "triple_recall": 0.8366336633663366,
+      "triple_f1": 0.7100840336134453,
+      "macro_precision": 0.5785836940836941,
+      "macro_recall": 0.8344285714285715,
+      "entity_type_accuracy": 1.0,
+      "gold_calls": 50
+    },
+    {
+      "run": "llm_voyager_gemma4-31b-it_v2_no_descriptors",
+      "model": "gemma4-31b-it",
+      "prompt_version": "v2_no_descriptors",
+      "n_calls": 287,
+      "json_validity_rate": 1.0,
+      "schema_conformance_rate": 0.9581881533101045,
+      "mean_triples_per_call": 4.588850174216028,
+      "repaired_rate": 0.0,
+      "inferred_rate": 0.0463173880030372,
+      "retry_rate": 0.0,
+      "salvage_rate": 0.0,
+      "fallback_rate": 0.0,
+      "failed_rate": 0.0,
+      "mean_latency_s": 10.05952613240418,
+      "triple_precision": 0.9166666666666666,
+      "triple_recall": 0.9257425742574258,
+      "triple_f1": 0.9211822660098522,
+      "macro_precision": 0.8521269841269842,
+      "macro_recall": 0.8925079365079364,
+      "entity_type_accuracy": 1.0,
+      "gold_calls": 50
+    },
+    {
+      "run": "llm_voyager_gemma4-31b-it_v3_no_example",
+      "model": "gemma4-31b-it",
+      "prompt_version": "v3_no_example",
+      "n_calls": 287,
+      "json_validity_rate": 1.0,
+      "schema_conformance_rate": 0.9442508710801394,
+      "mean_triples_per_call": 4.435540069686411,
+      "repaired_rate": 0.0,
+      "inferred_rate": 0.0204241948153967,
+      "retry_rate": 0.0,
+      "salvage_rate": 0.0,
+      "fallback_rate": 0.0,
+      "failed_rate": 0.0,
+      "mean_latency_s": 9.44862369337979,
+      "triple_precision": 0.9285714285714286,
+      "triple_recall": 0.900990099009901,
+      "triple_f1": 0.914572864321608,
+      "macro_precision": 0.862095238095238,
+      "macro_recall": 0.8917936507936508,
+      "entity_type_accuracy": 1.0,
+      "gold_calls": 50
+    },
+    {
+      "run": "llm_voyager_gemma4-31b-it_v0_open",
+      "model": "gemma4-31b-it",
+      "prompt_version": "v0_open",
+      "n_calls": 287,
+      "json_validity_rate": 1.0,
+      "schema_conformance_rate": 0.1289198606271777,
+      "mean_triples_per_call": 2.836236933797909,
+      "repaired_rate": 0.009501187648456057,
+      "inferred_rate": 0.0945945945945946,
+      "retry_rate": 0.9407665505226481,
+      "salvage_rate": 0.0,
+      "fallback_rate": 0.0,
+      "failed_rate": 0.0,
+      "mean_latency_s": 11.424439024390244,
+      "triple_precision": 0.7984496124031008,
+      "triple_recall": 0.5099009900990099,
+      "triple_f1": 0.6223564954682779,
+      "macro_precision": 0.7076666666666667,
+      "macro_recall": 0.5076825396825396,
+      "entity_type_accuracy": 1.0,
+      "gold_calls": 50
+    }
+  ],
+  "per_relation": {
+    "rule": {
+      "MENTIONS_ORG": {
+        "precision": 0.8260869565217391,
+        "recall": 0.3584905660377358,
+        "f1": 0.5,
+        "support": 53
+      },
+      "REQUESTS": {
+        "precision": 0.875,
+        "recall": 0.5384615384615384,
+        "f1": 0.6666666666666667,
+        "support": 39
+      },
+      "CLAIMS_TO_BE": {
+        "precision": 0.7368421052631579,
+        "recall": 0.6829268292682927,
+        "f1": 0.7088607594936709,
+        "support": 41
+      },
+      "USES_TACTIC": {
+        "precision": 0.8620689655172413,
+        "recall": 0.8333333333333334,
+        "f1": 0.847457627118644,
+        "support": 60
+      },
+      "PAY_VIA": {
+        "precision": 0.1111111111111111,
+        "recall": 0.25,
+        "f1": 0.15384615384615383,
+        "support": 4
+      },
+      "PROVIDES_NUMBER": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 5
+      }
+    },
+    "llm_voyager_gemma4-31b-it_v1_full_fb-qwen3-30b-a3b": {
+      "MENTIONS_ORG": {
+        "precision": 0.9347826086956522,
+        "recall": 0.8113207547169812,
+        "f1": 0.8686868686868686,
+        "support": 53
+      },
+      "REQUESTS": {
+        "precision": 0.9,
+        "recall": 0.9230769230769231,
+        "f1": 0.9113924050632911,
+        "support": 39
+      },
+      "CLAIMS_TO_BE": {
+        "precision": 0.8888888888888888,
+        "recall": 0.975609756097561,
+        "f1": 0.9302325581395349,
+        "support": 41
+      },
+      "USES_TACTIC": {
+        "precision": 0.8787878787878788,
+        "recall": 0.9666666666666667,
+        "f1": 0.9206349206349207,
+        "support": 60
+      },
+      "PROVIDES_NUMBER": {
+        "precision": 0.8,
+        "recall": 0.8,
+        "f1": 0.8000000000000002,
+        "support": 5
+      },
+      "PAY_VIA": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "f1": 0.6666666666666666,
+        "support": 4
+      }
+    },
+    "llm_voyager_qwen3-30b-a3b_v1_full": {
+      "MENTIONS_ORG": {
+        "precision": 0.7592592592592593,
+        "recall": 0.7735849056603774,
+        "f1": 0.7663551401869159,
+        "support": 53
+      },
+      "REQUESTS": {
+        "precision": 0.5070422535211268,
+        "recall": 0.9230769230769231,
+        "f1": 0.6545454545454545,
+        "support": 39
+      },
+      "CLAIMS_TO_BE": {
+        "precision": 0.7291666666666666,
+        "recall": 0.8536585365853658,
+        "f1": 0.7865168539325843,
+        "support": 41
+      },
+      "USES_TACTIC": {
+        "precision": 0.5543478260869565,
+        "recall": 0.85,
+        "f1": 0.6710526315789473,
+        "support": 60
+      },
+      "PAY_VIA": {
+        "precision": 0.5,
+        "recall": 0.5,
+        "f1": 0.5,
+        "support": 4
+      },
+      "PROVIDES_NUMBER": {
+        "precision": 0.8,
+        "recall": 0.8,
+        "f1": 0.8000000000000002,
+        "support": 5
+      }
+    },
+    "llm_voyager_gemma4-31b-it_v2_no_descriptors": {
+      "MENTIONS_ORG": {
+        "precision": 0.9795918367346939,
+        "recall": 0.9056603773584906,
+        "f1": 0.9411764705882353,
+        "support": 53
+      },
+      "REQUESTS": {
+        "precision": 0.9230769230769231,
+        "recall": 0.9230769230769231,
+        "f1": 0.9230769230769231,
+        "support": 39
+      },
+      "CLAIMS_TO_BE": {
+        "precision": 0.9285714285714286,
+        "recall": 0.9512195121951219,
+        "f1": 0.9397590361445782,
+        "support": 41
+      },
+      "USES_TACTIC": {
+        "precision": 0.8529411764705882,
+        "recall": 0.9666666666666667,
+        "f1": 0.90625,
+        "support": 60
+      },
+      "PROVIDES_NUMBER": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 5
+      },
+      "PAY_VIA": {
+        "precision": 1.0,
+        "recall": 0.25,
+        "f1": 0.4,
+        "support": 4
+      }
+    },
+    "llm_voyager_gemma4-31b-it_v3_no_example": {
+      "MENTIONS_ORG": {
+        "precision": 0.9148936170212766,
+        "recall": 0.8113207547169812,
+        "f1": 0.8600000000000001,
+        "support": 53
+      },
+      "REQUESTS": {
+        "precision": 0.9473684210526315,
+        "recall": 0.9230769230769231,
+        "f1": 0.935064935064935,
+        "support": 39
+      },
+      "CLAIMS_TO_BE": {
+        "precision": 0.9090909090909091,
+        "recall": 0.975609756097561,
+        "f1": 0.9411764705882352,
+        "support": 41
+      },
+      "USES_TACTIC": {
+        "precision": 0.95,
+        "recall": 0.95,
+        "f1": 0.9500000000000001,
+        "support": 60
+      },
+      "PROVIDES_NUMBER": {
+        "precision": 0.8,
+        "recall": 0.8,
+        "f1": 0.8000000000000002,
+        "support": 5
+      },
+      "PAY_VIA": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "f1": 0.6666666666666666,
+        "support": 4
+      }
+    },
+    "llm_voyager_gemma4-31b-it_v0_open": {
+      "MENTIONS_ORG": {
+        "precision": 0.9767441860465116,
+        "recall": 0.7924528301886793,
+        "f1": 0.875,
+        "support": 53
+      },
+      "REQUESTS": {
+        "precision": 0.8846153846153846,
+        "recall": 0.5897435897435898,
+        "f1": 0.7076923076923076,
+        "support": 39
+      },
+      "CLAIMS_TO_BE": {
+        "precision": 0.5263157894736842,
+        "recall": 0.4878048780487805,
+        "f1": 0.5063291139240507,
+        "support": 41
+      },
+      "USES_TACTIC": {
+        "precision": 0.7777777777777778,
+        "recall": 0.23333333333333334,
+        "f1": 0.35897435897435903,
+        "support": 60
+      },
+      "PAY_VIA": {
+        "precision": 1.0,
+        "recall": 0.25,
+        "f1": 0.4,
+        "support": 4
+      },
+      "PROVIDES_NUMBER": {
+        "precision": 1.0,
+        "recall": 0.6,
+        "f1": 0.7499999999999999,
+        "support": 5
+      }
+    }
+  }
+}
