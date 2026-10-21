@@ -1,0 +1,61 @@
+{
+  "experiment": "E2",
+  "n_train": 1358,
+  "n_test": 240,
+  "macro_f1": 1.0,
+  "report": {
+    "fraudster": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 120.0
+    },
+    "other_legitimate": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 53.0
+    },
+    "salesperson": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 67.0
+    },
+    "accuracy": 1.0,
+    "macro avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 240.0
+    },
+    "weighted avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 240.0
+    }
+  },
+  "labels": [
+    "fraudster",
+    "other_legitimate",
+    "salesperson"
+  ],
+  "confusion_matrix": [
+    [
+      120,
+      0,
+      0
+    ],
+    [
+      0,
+      53,
+      0
+    ],
+    [
+      0,
+      0,
+      67
+    ]
+  ]
+}
