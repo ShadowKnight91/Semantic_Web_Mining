@@ -1,0 +1,84 @@
+{
+  "datasets": [
+    {
+      "dataset": "bothbosu",
+      "n": 1598,
+      "n_scam": 799,
+      "scam_rate": 0.5,
+      "mean_words": 229.95994993742178,
+      "median_words": 238.0,
+      "mean_turns": 13.685231539424281
+    },
+    {
+      "dataset": "kaggle",
+      "n": 793,
+      "n_scam": 393,
+      "scam_rate": 0.49558638083228246,
+      "mean_words": 46.272383354350566,
+      "median_words": 36.0,
+      "mean_turns": 1.0
+    },
+    {
+      "dataset": "ncsu",
+      "n": 713,
+      "n_scam": 713,
+      "scam_rate": 1.0,
+      "mean_words": 62.04908835904628,
+      "median_words": 53.0,
+      "mean_turns": 1.0
+    }
+  ],
+  "splits": [
+    {
+      "dataset": "bothbosu",
+      "split": "test",
+      "n": 240
+    },
+    {
+      "dataset": "bothbosu",
+      "split": "train",
+      "n": 1118
+    },
+    {
+      "dataset": "bothbosu",
+      "split": "val",
+      "n": 240
+    },
+    {
+      "dataset": "kaggle",
+      "split": "external",
+      "n": 793
+    },
+    {
+      "dataset": "ncsu",
+      "split": "external",
+      "n": 713
+    }
+  ],
+  "vocabulary_overlap": [
+    {
+      "dataset_a": "bothbosu",
+      "dataset_b": "kaggle",
+      "vocab_a": 2618,
+      "vocab_b": 1993,
+      "jaccard": 0.31742857142857145,
+      "oov_rate_b_given_a": 0.13131127450980393
+    },
+    {
+      "dataset_a": "bothbosu",
+      "dataset_b": "ncsu",
+      "vocab_a": 2618,
+      "vocab_b": 989,
+      "jaccard": 0.23739279588336193,
+      "oov_rate_b_given_a": 0.07855080200926982
+    },
+    {
+      "dataset_a": "kaggle",
+      "dataset_b": "ncsu",
+      "vocab_a": 1993,
+      "vocab_b": 989,
+      "jaccard": 0.24769874476987447,
+      "oov_rate_b_given_a": 0.11815380135407313
+    }
+  ]
+}

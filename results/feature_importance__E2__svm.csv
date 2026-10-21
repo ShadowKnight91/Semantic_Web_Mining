@@ -1,0 +1,41 @@
+feature,weight
+graph:knn_scam_rate,0.286764939775761
+graph:community_scam_rate,0.23668980827505973
+graph:entity_max_popularity,0.1705941192523964
+graph:sim_diff,0.14174021649166405
+graph:sim_scam_max,0.13966396995797917
+graph:sim_legit_topk,-0.13628008852552942
+graph:sim_scam_topk,0.13130393349293312
+graph:sim_legit_max,-0.11779691784196156
+entity:Organization::XYZ Bank,-0.11029506598023626
+graph:n_USES_TACTIC,0.10653169816599427
+entity:RequestedAsset::personal_info,-0.098502939535748
+graph:entity_mean_popularity,0.09369096838742595
+graph:entity_risk_min,0.0870201506037458
+entity:PressureTactic::reward,0.08494816598910045
+graph:n_REQUESTS,0.08055819799619968
+graph:het_degree,0.07724374583264353
+entity:ClaimedIdentity::telemarketer_sales,-0.07613565812105887
+graph:n_known_entities,0.06817222383774081
+entity:ClaimedIdentity::insurance,-0.06769245306153034
+entity:ClaimedIdentity::prize_or_lottery,0.06675187801668059
+graph:entity_risk_mean,0.06533321348115019
+graph:het_pagerank,0.06407641547519573
+entity:Organization::American Express,0.06233024566503118
+entity:RequestedAsset::card_number,0.06178420712323817
+graph:n_inferred,-0.05751601172789481
+entity:PressureTactic::urgency,-0.05550005727209303
+entity:Organization::XYZ Company,-0.043834410620343815
+entity:RequestedAsset::bank_account,0.03996710892299233
+graph:n_PAY_VIA,-0.039002985496375854
+graph:cc_weighted_degree,0.03786575181260702
+entity:Organization::Better Business Bureau,-0.034555850484227546
+graph:cc_degree,0.03416617256731915
+entity:Organization::ABC Insurance Company,-0.031254705785933
+graph:cc_pagerank,0.03097078199250598
+graph:entity_risk_max,0.030693390895274352
+entity:Organization::Visa,0.02920700752210591
+entity:ClaimedIdentity::bank,-0.028657133304583717
+graph:n_PROVIDES_NUMBER,0.023739526657883803
+entity:ClaimedIdentity::retailer_customer_service,0.02352137410182779
+entity:RequestedAsset::money,-0.02167951357217009

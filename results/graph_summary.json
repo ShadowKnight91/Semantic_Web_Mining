@@ -1,0 +1,189 @@
+{
+  "calls": 3104,
+  "entities": 501,
+  "entities_by_type": {
+    "Organization": 376,
+    "CallbackNumber": 87,
+    "ClaimedIdentity": 15,
+    "RequestedAsset": 9,
+    "PaymentChannel": 8,
+    "PressureTactic": 6
+  },
+  "edges": 12441,
+  "edges_by_relation": {
+    "CLAIMS_TO_BE": 2839,
+    "MENTIONS_ORG": 2446,
+    "USES_TACTIC": 3806,
+    "REQUESTS": 2110,
+    "PAY_VIA": 187,
+    "PROVIDES_NUMBER": 1053
+  },
+  "connected_components": 136,
+  "per_label": {
+    "legitimate": {
+      "mean_entities": 2.5479566305254377,
+      "share_without_entities": 0.1067556296914095
+    },
+    "scam": {
+      "mean_entities": 4.927034120734908,
+      "share_without_entities": 0.0020997375328084544
+    }
+  },
+  "top_entities": [
+    {
+      "type": "PressureTactic",
+      "entity": "reward",
+      "calls": 1196,
+      "scam_rate_all_labels": 0.6488294314381271
+    },
+    {
+      "type": "PressureTactic",
+      "entity": "urgency",
+      "calls": 1023,
+      "scam_rate_all_labels": 0.8836754643206256
+    },
+    {
+      "type": "PressureTactic",
+      "entity": "fear",
+      "calls": 945,
+      "scam_rate_all_labels": 0.9809523809523809
+    },
+    {
+      "type": "RequestedAsset",
+      "entity": "personal_info",
+      "calls": 658,
+      "scam_rate_all_labels": 0.7188449848024316
+    },
+    {
+      "type": "CallbackNumber",
+      "entity": "ivr:press-1",
+      "calls": 608,
+      "scam_rate_all_labels": 1.0
+    },
+    {
+      "type": "PressureTactic",
+      "entity": "threat",
+      "calls": 494,
+      "scam_rate_all_labels": 1.0
+    },
+    {
+      "type": "ClaimedIdentity",
+      "entity": "government_agent",
+      "calls": 451,
+      "scam_rate_all_labels": 0.975609756097561
+    },
+    {
+      "type": "ClaimedIdentity",
+      "entity": "retailer_customer_service",
+      "calls": 418,
+      "scam_rate_all_labels": 0.9258373205741627
+    },
+    {
+      "type": "RequestedAsset",
+      "entity": "money",
+      "calls": 368,
+      "scam_rate_all_labels": 0.8396739130434783
+    },
+    {
+      "type": "RequestedAsset",
+      "entity": "ssn",
+      "calls": 337,
+      "scam_rate_all_labels": 1.0
+    },
+    {
+      "type": "Organization",
+      "entity": "Amazon",
+      "calls": 310,
+      "scam_rate_all_labels": 0.8903225806451613
+    },
+    {
+      "type": "ClaimedIdentity",
+      "entity": "insurance",
+      "calls": 301,
+      "scam_rate_all_labels": 0.15614617940199335
+    },
+    {
+      "type": "Organization",
+      "entity": "Social Security Administration",
+      "calls": 265,
+      "scam_rate_all_labels": 1.0
+    },
+    {
+      "type": "ClaimedIdentity",
+      "entity": "tech_support",
+      "calls": 257,
+      "scam_rate_all_labels": 0.9571984435797666
+    },
+    {
+      "type": "RequestedAsset",
+      "entity": "bank_account",
+      "calls": 235,
+      "scam_rate_all_labels": 0.9829787234042553
+    },
+    {
+      "type": "ClaimedIdentity",
+      "entity": "delivery_service",
+      "calls": 232,
+      "scam_rate_all_labels": 0.10344827586206896
+    },
+    {
+      "type": "Organization",
+      "entity": "Better Business Bureau",
+      "calls": 219,
+      "scam_rate_all_labels": 0.0045662100456621
+    },
+    {
+      "type": "RequestedAsset",
+      "entity": "remote_access",
+      "calls": 218,
+      "scam_rate_all_labels": 0.9862385321100917
+    },
+    {
+      "type": "ClaimedIdentity",
+      "entity": "telemarketer_sales",
+      "calls": 210,
+      "scam_rate_all_labels": 0.1761904761904762
+    },
+    {
+      "type": "ClaimedIdentity",
+      "entity": "relative_or_friend",
+      "calls": 184,
+      "scam_rate_all_labels": 0.05434782608695652
+    },
+    {
+      "type": "ClaimedIdentity",
+      "entity": "other",
+      "calls": 159,
+      "scam_rate_all_labels": 0.41509433962264153
+    },
+    {
+      "type": "CallbackNumber",
+      "entity": "ivr:press-2",
+      "calls": 155,
+      "scam_rate_all_labels": 1.0
+    },
+    {
+      "type": "ClaimedIdentity",
+      "entity": "prize_or_lottery",
+      "calls": 153,
+      "scam_rate_all_labels": 0.9934640522875817
+    },
+    {
+      "type": "PressureTactic",
+      "entity": "secrecy",
+      "calls": 147,
+      "scam_rate_all_labels": 0.9931972789115646
+    },
+    {
+      "type": "Organization",
+      "entity": "Microsoft",
+      "calls": 145,
+      "scam_rate_all_labels": 1.0
+    }
+  ],
+  "communities": 174,
+  "largest_community": 221,
+  "mean_cc_degree": 14.463917525773196,
+  "backend": "neo4j",
+  "run": "llm_voyager_gemma4-31b-it_v1_full_fb-qwen3-30b-a3b"
+}

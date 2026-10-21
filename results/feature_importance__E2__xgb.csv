@@ -1,0 +1,41 @@
+feature,weight
+graph:entity_risk_max,0.3827161
+graph:sim_diff,0.1999536
+graph:knn_scam_rate,0.15579276
+graph:community_scam_rate,0.15248309
+graph:sim_scam_topk,0.07206167
+graph:sim_scam_max,0.035114348
+tfidf:delivery,0.0017482425
+tfidf:alright,0.00013024682
+entity:Organization::Nelnet,0.0
+entity:CallbackNumber::844-877-0123,0.0
+entity:CallbackNumber::ivr:press-0,0.0
+entity:CallbackNumber::ivr:press-3,0.0
+entity:Organization::Teco Energy Electricity Company,0.0
+entity:Organization::Marriott Hotels,0.0
+entity:Organization::Biden Administration,0.0
+entity:Organization::Department of Federal Reserve System,0.0
+entity:CallbackNumber::888-511-0275,0.0
+entity:Organization::Student Services Department,0.0
+entity:CallbackNumber::530-290-1697,0.0
+entity:CallbackNumber::714-406-4370,0.0
+entity:Organization::Dominion Energy Electricity Company,0.0
+entity:CallbackNumber::888-207-1288,0.0
+entity:Organization::Directtv,0.0
+entity:CallbackNumber::8333041447456,0.0
+tfidf:10 winners,0.0
+tfidf:10 minutes,0.0
+tfidf:10 discount,0.0
+tfidf:10 business,0.0
+tfidf:10 am,0.0
+tfidf:10 15,0.0
+tfidf:10 000,0.0
+tfidf:10,0.0
+tfidf:012345,0.0
+tfidf:000 with,0.0
+tfidf:000 that,0.0
+tfidf:000 people,0.0
+tfidf:000 in,0.0
+tfidf:000 gift,0.0
+tfidf:000 and,0.0
+entity:Organization::Navient,0.0

@@ -1,0 +1,62 @@
+{
+  "topology_features": [
+    "het_degree",
+    "het_pagerank",
+    "het_betweenness",
+    "cc_degree",
+    "cc_weighted_degree",
+    "cc_pagerank",
+    "entity_mean_popularity",
+    "entity_max_popularity",
+    "community_size",
+    "n_CLAIMS_TO_BE",
+    "n_MENTIONS_ORG",
+    "n_USES_TACTIC",
+    "n_REQUESTS",
+    "n_PAY_VIA",
+    "n_PROVIDES_NUMBER",
+    "n_inferred",
+    "has_entities",
+    "entity_log_degree",
+    "entity_pagerank"
+  ],
+  "fusion": {
+    "text_dim": 64,
+    "topo_dim": 16,
+    "type_dim": 8
+  },
+  "inductive": true,
+  "variants": [
+    {
+      "variant": "text+topo",
+      "model": "graphsage",
+      "val_pr_auc": 1.0,
+      "epochs": 39,
+      "input_dims": {
+        "text": 384,
+        "topo": 19,
+        "type": 7
+      }
+    },
+    {
+      "variant": "text",
+      "model": "graphsage_text",
+      "val_pr_auc": 1.0,
+      "epochs": 46,
+      "input_dims": {
+        "text": 384,
+        "type": 7
+      }
+    },
+    {
+      "variant": "topo",
+      "model": "graphsage_topo",
+      "val_pr_auc": 1.0,
+      "epochs": 61,
+      "input_dims": {
+        "topo": 19,
+        "type": 7
+      }
+    }
+  ]
+}
