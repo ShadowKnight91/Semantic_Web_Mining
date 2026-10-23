@@ -410,6 +410,6 @@ tests/           pytest suite (runs offline on synthetic data)
   `valid_rate`; they used to be scored 0.5, which the 0.5 threshold counted as a scam detection.
 * Small local models (e.g. `qwen2.5:0.5b`) produce valid JSON but noisy, sometimes copied triples; use
   7B+ models (or Voyager) for the real extraction runs.
-* Throughput on an M1 Pro (16 GB): `qwen2.5:7b` about 15 s per call (roughly 9-10 h for all 2,312 calls),
+* Throughput on an M1 Pro (16 GB): `qwen2.5:7b` about 15 s per call (roughly 13 h for all 3,104 calls),
   `gemma2:9b` about 20 s. Ollama answers one request at a time unless it is started with
   `OLLAMA_NUM_PARALLEL` > 1, so `--workers` only helps then. Runs resume, so they can span several sessions.

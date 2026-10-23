@@ -38,11 +38,16 @@ def build_report(ctx) -> str:
         ext = m[~m["eval_set"].isin(["test", "test_imbalanced"])]
         if not ext.empty:
             md += ["\n## Cross-dataset generalization (X2)\n",
+                   "Note: the LLM zero-shot rows use a stratified sample of each external set (see `n`); the same-subset table below scores every model on exactly those calls.\n",
                    md_table(ext.sort_values(["eval_set", "experiment", "model"])[["eval_set", *SHOW]])]
             gen = generalization_table(m)
             if not gen.empty:
                 gen.to_csv(res / "generalization.csv", index=False)
                 md += ["\n### Recall / PR-AUC drop vs. in-distribution test\n", md_table(gen)]
+    p = res / "zeroshot_same_subset.csv"
+    if p.exists():   # CHANGE (review): like-for-like comparison with the zero-shot LLM
+        md += ["\n### Same-subset comparison (every model on the calls the zero-shot LLM saw)\n",
+               md_table(pd.read_csv(p))]
     for fname, title in (("cv_results.csv", "5-fold stratified cross-validation (mean / std)"),
                          ("loto_summary.csv", "Leave-one-type-out (flag rate = recall on unseen scam types, "
                                               "false-positive rate on unseen legitimate types)"),
@@ -73,13 +78,21 @@ def build_report(ctx) -> str:
     p = res / "ablation.csv"
     if p.exists():
         a = pd.read_csv(p)
-        a = a[(a["eval_set"] == "test") & (a["ablation"] != "none")]
-        md += ["\n## Ablations (test split, delta vs. full model)\n",
-               md_table(a[["ablation", "removed", "experiment", "model", "pr_auc", "delta_pr_auc", "delta_recall"]])]
+        # CHANGE (review): the BothBosu test split is saturated (every delta is 0), so the table shows the
+        # cross-dataset sets, where removing an entity type or feature group actually changes the result
+        ext = [s for s in ("ncsu+kaggle", "kaggle", "ncsu") if s in set(a["eval_set"])]
+        a = a[a["eval_set"].isin(ext) & (a["ablation"] != "none")]
+        a = a.sort_values(["eval_set", "experiment", "model", "delta_pr_auc"])
+        md += ["\n## Ablations (cross-dataset sets, delta vs. full model)\n",
+               "The BothBosu test split is saturated (all deltas 0); negative values mean the removed part helped.\n",
+               md_table(a[["eval_set", "ablation", "removed", "experiment", "model", "pr_auc", "delta_pr_auc",
+                           "delta_recall"]])]
     p = res / "multiclass.json"
     if p.exists():
         mc = load_json(p)
-        md += ["\n## Three-way classification (stretch goal)\n", f"Macro-F1 {mc['macro_f1']:.3f} on {mc['n_test']} test calls\n"]
+        md += ["\n## Three-way classification (stretch goal)\n", f"Macro-F1 {mc['macro_f1']:.3f} on {mc['n_test']} test calls. "
+               "Limitation: BothBosu has no prankster calls, so the classes are fraudster / salesperson / other "
+               "legitimate, and the synthetic test split is saturated.\n"]
     text = "\n".join(md)
     (res / "REPORT.md").write_text(text, encoding="utf-8")
     log.info("Report -> %s", res / "REPORT.md")
