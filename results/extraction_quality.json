@@ -368,5 +368,11 @@
         "support": 5
       }
     }
+  },
+  "inter_annotator": {
+    "calls": 50,
+    "triple_f1": 0.9925558312655087,
+    "precision_B_vs_A": 0.9950248756218906,
+    "recall_B_vs_A": 0.9900990099009901
   }
 }

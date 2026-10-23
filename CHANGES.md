@@ -66,3 +66,10 @@ Both branches fixed some of the same things independently; where they overlapped
 | `run-all` | builds the graph from the run it just extracted | `extraction.default_run` (the Gemma run) is for the individual commands |
 
 Tests: 56, all pass.
+
+## Annotator B (X1 inter-annotator agreement)
+
+`annotator_B.jsonl` was still the empty template. It now holds a second, independent AI-assisted pass over the
+50 calls (blind to annotator A and to every extractor), which the course instructor approved. Agreement with A:
+triple F1 0.993 on 50 calls, 3 borderline disagreements. `report` now prints this agreement under the X1 table;
+`data/annotations/PROVENANCE.md` documents both passes and why the number is an upper bound.

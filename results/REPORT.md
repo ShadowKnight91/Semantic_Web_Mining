@@ -330,6 +330,9 @@ Note: the LLM zero-shot rows use a stratified sample of each external set (see `
 | llm_voyager_gemma4-31b-it_v0_open | gemma4-31b-it | v0_open | 287 | 1.000 | 0.129 | 2.836 | 0.010 | 0.095 | 0.941 | 0.000 | 0.000 | 0.000 | 11.424 | 0.798 | 0.510 | 0.622 | 0.708 | 0.508 | 1.000 | 50 |
 
 
+Inter-annotator agreement (annotator B vs. A, 50 calls): triple F1 0.993 (precision 0.995, recall 0.990). The scores above use annotator A as the reference; how A and B were made: `data/annotations/PROVENANCE.md`.
+
+
 ## GraphSAGE input fusion (E4)
 
 Text block -> 64-d, topology block (19 label-free features) -> 16-d, node type -> 8-d; concatenated, LayerNorm, then 2 mean-aggregation SAGE layers. Training graph: inductive (no test / external calls).

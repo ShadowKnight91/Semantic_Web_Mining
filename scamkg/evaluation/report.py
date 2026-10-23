@@ -56,6 +56,12 @@ def build_report(ctx) -> str:
         p = res / fname
         if p.exists():
             md += [f"\n## {title}\n", md_table(pd.read_csv(p))]
+    p = res / "extraction_quality.json"
+    ia = load_json(p).get("inter_annotator") if p.exists() else None
+    if ia:
+        md += [f"\nInter-annotator agreement (annotator B vs. A, {ia['calls']} calls): triple F1 {ia['triple_f1']:.3f} "
+               f"(precision {ia['precision_B_vs_A']:.3f}, recall {ia['recall_B_vs_A']:.3f}). The scores above use "
+               "annotator A as the reference; how A and B were made: `data/annotations/PROVENANCE.md`.\n"]
     p = res / "graphsage_fusion.json"
     if p.exists():   # CHANGE (TA comment 2): document the GraphSAGE input fusion and its block ablation
         g = load_json(p)
