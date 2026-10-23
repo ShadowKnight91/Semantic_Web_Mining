@@ -44,6 +44,16 @@ class ScamDetector:
                                         provider=meta.get("provider") if same_llm else None,
                                         prompt_version=meta.get("prompt_version") if same_llm else None)
         self.labeled_ids = [c for c in self.bundle["labeled_ids"] if c in self.ctx.calls.index]
+        # caller type (fraudster / salesperson / prankster / other legitimate), when `multiclass` saved a model
+        main = (cfg["models"].get("multiclass") or {}).get("main") or ["E2", "lr"]
+        mc_path = self.ctx.paths.models / f"multiclass__{main[0]}__{main[1]}.joblib"
+        self.caller_model = joblib.load(mc_path) if mc_path.exists() else None
+        if self.caller_model is not None and self.caller_model.get("run") != self.ctx.run_name:
+            log.info("The caller-type model was trained on the KG of run %s, not %s - not used",
+                        self.caller_model.get("run"), self.ctx.run_name)
+            self.caller_model = None
+        self.caller_labeled = ([c for c in self.caller_model["labeled_ids"] if c in self.ctx.calls.index]
+                               if self.caller_model is not None else [])
 
     def score(self, transcript: str) -> dict:
         ctx = self.ctx
@@ -58,15 +68,31 @@ class ScamDetector:
         kg = CallKG(calls.index.tolist(), extractions, ctx.ontology)
         tmp = Context(ctx.cfg, ctx.paths, calls, ctx.ontology)
         tmp.run_name, tmp.extractions, tmp.kg = ctx.run_name, extractions, kg
-        graph_df = None
-        if fitted.graph_columns or fitted.onehot_names:
-            tmp.fb = GraphFeatureBuilder(kg, ctx.cfg["graph"], seed=ctx.seed)
+        built = {}
+
+        def features(fitted, labeled: list[str]):
+            """Feature row of the new call for one trained model (graph features built once per label set)."""
+            graph_row = oh = None
+            if (fitted.graph_columns or fitted.onehot_names) and tmp.fb is None:
+                tmp.fb = GraphFeatureBuilder(kg, ctx.cfg["graph"], seed=ctx.seed)
             if fitted.graph_columns:
-                graph_df = tmp.fb.build(self.labeled_ids, tmp.labels(self.labeled_ids))
-        oh = tmp.fb.onehot_matrix([NEW_ID], fitted.onehot_names) if fitted.onehot_names else None
-        X = fitted.transform_parts([plain], graph_df.loc[[NEW_ID]] if graph_df is not None else None, oh)
-        score = float(self.bundle["model"].predict_proba(X)[0, 1])
+                key = tuple(labeled)
+                if key not in built:
+                    built[key] = tmp.fb.build(labeled, tmp.labels(labeled))
+                graph_row = built[key].loc[[NEW_ID]]
+            if fitted.onehot_names:
+                oh = tmp.fb.onehot_matrix([NEW_ID], fitted.onehot_names)
+            return fitted.transform_parts([plain], graph_row, oh)
+
+        score = float(self.bundle["model"].predict_proba(features(fitted, self.labeled_ids))[0, 1])
         thr = float(self.cfg["models"].get("threshold", 0.5))
         explanation = explain_call(tmp, NEW_ID, score, labeled_ids=self.labeled_ids)
-        return {"score": score, "is_scam": score >= thr, "triples": rec.triples, "explanation": explanation,
-                "model": f"{self.bundle['experiment']}/{self.bundle['model_name']}", "extractor": self.extractor.name}
+        out = {"score": score, "is_scam": score >= thr, "triples": rec.triples, "explanation": explanation,
+               "model": f"{self.bundle['experiment']}/{self.bundle['model_name']}", "extractor": self.extractor.name}
+        if self.caller_model is not None:
+            mc = self.caller_model
+            p = mc["model"].predict_proba(features(mc["fitted"], self.caller_labeled))[0]
+            probs = {str(c): round(float(v), 4) for c, v in zip(mc["model"].classes_, p)}
+            out.update(caller_type=max(probs, key=probs.get), caller_type_probs=probs,
+                       caller_type_model=f"{mc['experiment']}/{mc['model_name']}")
+        return out

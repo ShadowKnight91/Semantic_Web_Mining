@@ -45,7 +45,7 @@ flowchart LR
 | Generalization to unseen scam scripts / legitimate call types (leave-one-type-out) | `loto` | `scamkg/models/classical.py` |
 | Ablations: each entity type, each feature group | `ablate` | `scamkg/evaluation/ablation.py` |
 | Explainability: identity-tactic-asset path per flagged call | `explain`, `predict`, dashboard | `scamkg/evaluation/explain.py`, `scamkg/predict.py` |
-| Stretch: fraudster / salesperson / prankster (BothBosu types give gold labels; LLM relabeling for other data) | `multiclass`, `relabel` | `scamkg/data/loaders.py`, `scamkg/models/llm_zeroshot.py` |
+| Caller type: fraudster / salesperson / prankster / other legitimate (BothBosu types + generated prank calls; LLM relabeling for other data) | `generate-pranks`, `run-multiclass`, `multiclass`, `relabel` | `scamkg/data/pranks.py`, `scamkg/models/classical.py`, `config/multiclass.yaml` |
 | Optional BankSim reference baseline | `banksim` | `scamkg/models/banksim.py` |
 | Deliverables: ontology, KG, Neo4j dump, models, dashboard, report | `build-graph`, `report`, `dashboard` | `results/`, `data/kg/`, `artifacts/` |
 
@@ -221,15 +221,30 @@ Outputs go to `data/demo/`, `results/demo/` (see `results/demo/REPORT.md`) and `
 
    Or everything at once: `.venv\Scripts\python -m scamkg run-all --extractor llm --model qwen2.5:7b`.
 
-7. **Stretch goal (three-way labels).**
+7. **Caller type: fraudster vs. prankster vs. salesperson** (plus "other legitimate" for deliveries and wrong
+   numbers, so every call has a class). No data set contains prank calls, so `generate-pranks` writes them
+   with a local LLM in BothBosu's dialogue format: 120 prank calls over 28 prank scenarios (several imitate a
+   scam or sales opening) and 36 fraud / sales calls by the same model and prompt template. The second set is
+   test-only: if the classifier labels it `prankster`, it learned the generator's style, not prank content.
+   The generated calls are committed in `data/pranks/pranks.jsonl`, so nobody has to run this again (on the
+   machine that made them, a rerun replays the LLM cache).
 
    ```bash
-   .venv\Scripts\python -m scamkg relabel --model qwen2.5:7b
+   .venv\Scripts\python -m scamkg --config config/local.yaml generate-pranks
    ```
 
+   `config/multiclass.yaml` runs the task in its own folders (`data/multiclass/`, `results/multiclass/`,
+   `artifacts/multiclass/`), so the binary results are untouched: BothBosu + the prank calls, the BothBosu
+   split unchanged, the pranks split the same way, a rule-based KG, E1 / E2 / E2G with logistic regression and
+   random forest, per-class F1, confusion matrices and the style check (`results/multiclass/REPORT.md`):
+
    ```bash
-   .venv\Scripts\python -m scamkg multiclass
+   .venv\Scripts\python -m scamkg --config config/multiclass.yaml run-multiclass
    ```
+
+   With that config, `predict` and the dashboard ("Try a transcript", "Caller types") also give the caller type.
+   On the main config, `multiclass` runs the three classes the data has (no prankster). For other data sets,
+   `relabel --model qwen2.5:7b` asks an LLM for caller types first.
 
 Score any new transcript with a trained model and get its KG explanation:
 

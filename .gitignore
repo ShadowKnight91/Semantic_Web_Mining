@@ -12,6 +12,7 @@ data/processed/
 data/kg/
 data/cache/
 data/demo/
+data/multiclass/
 results/
 artifacts/
 neo4j/data/

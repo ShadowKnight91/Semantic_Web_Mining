@@ -95,11 +95,34 @@ def build_report(ctx) -> str:
                            "delta_recall"]])]
     p = res / "multiclass.json"
     if p.exists():
-        mc = load_json(p)
-        md += ["\n## Three-way classification (stretch goal)\n", f"Macro-F1 {mc['macro_f1']:.3f} on {mc['n_test']} test calls. "
-               "Limitation: BothBosu has no prankster calls, so the classes are fraudster / salesperson / other "
-               "legitimate, and the synthetic test split is saturated.\n"]
+        md += caller_type_section(load_json(p))
     text = "\n".join(md)
     (res / "REPORT.md").write_text(text, encoding="utf-8")
     log.info("Report -> %s", res / "REPORT.md")
     return text
+
+
+def caller_type_section(mc: dict) -> list[str]:
+    md = ["\n## Caller-type classification (fraudster / salesperson / prankster / other legitimate)\n"]
+    if "results" not in mc:            # written by an older version
+        return md + [f"Macro-F1 {mc['macro_f1']:.3f} on {mc['n_test']} test calls.\n"]
+    missing = mc.get("missing_classes") or []
+    counts = ", ".join(f"{k} {v}" for k, v in mc.get("train_counts", {}).items())
+    md.append(f"Training calls (train + val): {counts}. Main model: {mc['main']}; KG run: `{mc.get('run')}`.\n")
+    if "prankster" in missing:
+        md.append("This configuration has no prank calls (no data set contains any), so the task has "
+                  f"{len(mc['classes'])} classes. The four-way task with generated prank calls is "
+                  "`config/multiclass.yaml` (results in `results/multiclass/REPORT.md`).\n")
+    res = pd.DataFrame(mc["results"])
+    md.append(md_table(res.round(3)))
+    cm = mc.get("confusion", {}).get(f"{mc['main'].replace('/', '__')}__test")
+    if cm:
+        md += [f"\nConfusion matrix, test split ({mc['main']}; rows = true type, columns = predicted):\n",
+               md_table(pd.DataFrame(cm, columns=mc["classes"]).assign(true=mc["classes"])[["true", *mc["classes"]]])]
+    ctrl = res[res["eval_set"] == "pranks_control"]
+    if not ctrl.empty and "predicted_prankster" in ctrl:
+        shares = ", ".join(f"{r.experiment}/{r.model} {r.predicted_prankster:.0%}" for r in ctrl.itertuples())
+        md.append(f"\nStyle check: {int(ctrl['n'].iloc[0])} fraud / sales calls written by the same model and prompt "
+                  f"template as the prank calls; share predicted `prankster`: {shares}. A model that labels them "
+                  "`prankster` recognizes the generator's style rather than prank content.\n")
+    return md

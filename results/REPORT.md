@@ -524,6 +524,23 @@ The BothBosu test split is saturated (all deltas 0); negative values mean the re
 | ncsu+kaggle | entity_type | ClaimedIdentity | E2G | xgb | 0.956 | 0.140 | -0.080 |
 
 
-## Three-way classification (stretch goal)
+## Caller-type classification (fraudster / salesperson / prankster / other legitimate)
 
-Macro-F1 1.000 on 240 test calls. Limitation: BothBosu has no prankster calls, so the classes are fraudster / salesperson / other legitimate, and the synthetic test split is saturated.
+Training calls (train + val): fraudster 679, other_legitimate 346, salesperson 333. Main model: E2/lr; KG run: `llm_voyager_gemma4-31b-it_v1_full_fb-qwen3-30b-a3b`.
+
+This configuration has no prank calls (no data set contains any), so the task has 3 classes. The four-way task with generated prank calls is `config/multiclass.yaml` (results in `results/multiclass/REPORT.md`).
+
+| experiment | model | eval_set | n | accuracy | macro_f1 | f1_fraudster | f1_salesperson | f1_other_legitimate |
+|---|---|---|---|---|---|---|---|---|
+| E1 | lr | test | 240 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
+| E2 | lr | test | 240 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
+| E2G | lr | test | 240 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
+
+
+Confusion matrix, test split (E2/lr; rows = true type, columns = predicted):
+
+| true | fraudster | salesperson | other_legitimate |
+|---|---|---|---|
+| fraudster | 120 | 0 | 0 |
+| salesperson | 0 | 67 | 0 |
+| other_legitimate | 0 | 0 | 53 |

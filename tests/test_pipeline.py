@@ -115,3 +115,24 @@ def test_run_all_end_to_end(tmp_path):
     assert main(["--config", str(override), "run-all", "--skip-deep"]) == 0
     report = (tmp_path / "results" / "REPORT.md").read_text(encoding="utf-8")
     assert "Leave-one-type-out" in report and "Cross-dataset generalization" in report
+
+
+def test_caller_type_classification_and_predict(demo_ctx, demo_cfg):
+    """Four caller types (the demo data has template prank calls); the saved model feeds predict."""
+    import joblib
+    import numpy as np
+    from scamkg.models.classical import CALLER_TYPES, run_multiclass
+    from scamkg.predict import ScamDetector
+    out = run_multiclass(demo_ctx, ["E1", "E2"], ["lr"])
+    assert out["classes"] == CALLER_TYPES and not out["missing_classes"]
+    res = pd.read_csv(demo_ctx.paths.results / "multiclass.csv").set_index(["experiment", "model", "eval_set"])
+    assert res.at[("E2", "lr", "test"), "macro_f1"] > 0.8
+    assert np.array(out["confusion"]["E2__lr__test"]).sum() == res.at[("E2", "lr", "test"), "n"]
+    assert ("E2", "lr", "demo_shifted") in res.index
+    bundle = joblib.load(demo_ctx.paths.models / "multiclass__E2__lr.joblib")
+    assert sorted(bundle["model"].classes_) == sorted(CALLER_TYPES)
+    if not (demo_ctx.paths.models / "E2__lr.joblib").exists():
+        run_classical(demo_ctx, ["E2"], ["lr"], tune=False)
+    got = ScamDetector(demo_cfg, "E2", "lr").score("caller: Is your refrigerator running? Then go catch it! Ha ha!\n"
+                                                    "receiver: Very funny.")
+    assert got["caller_type"] in CALLER_TYPES and abs(sum(got["caller_type_probs"].values()) - 1) < 1e-3

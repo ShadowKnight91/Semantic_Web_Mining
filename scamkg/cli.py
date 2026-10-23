@@ -32,6 +32,15 @@ def cmd_demo_data(args, cfg):
     generate_demo_data(paths.raw, args.n_primary, args.n_shifted, args.n_robocall, int(cfg["project"]["seed"]))
 
 
+def cmd_generate_pranks(args, cfg):
+    from scamkg.data.pranks import generate
+    paths = get_paths(cfg).ensure()
+    src = (cfg["data"].get("sources") or {}).get("pranks") or {}
+    out = Path(args.out) if args.out else ROOT / src.get("local_dir", "data/pranks") / "pranks.jsonl"
+    generate(cfg, out, paths.cache, n_pranks=args.n, n_controls=args.controls, model=args.model,
+             provider=args.provider, seed=int(cfg["project"]["seed"]))
+
+
 def cmd_preprocess(args, cfg):
     from scamkg.data.preprocess import preprocess
     preprocess(cfg, get_paths(cfg).ensure())
@@ -285,7 +294,23 @@ def cmd_multiclass(args, cfg):
         ctx.attach_graph(args.run)
     except FileNotFoundError:
         pass
-    run_multiclass(ctx)
+    run_multiclass(ctx, getattr(args, "experiments", None), getattr(args, "models", None))
+
+
+def cmd_run_multiclass(args, cfg):
+    """Caller-type pipeline (use with config/multiclass.yaml): preprocess -> rule-based triples (unless --run
+    names an existing run) -> KG -> binary models (for predict / the dashboard) -> caller-type models -> report."""
+    ns = argparse.Namespace
+    cmd_preprocess(args, cfg)
+    run = args.run
+    if run is None:
+        cmd_extract(ns(extractor="rule", datasets=None, splits=None, ids_file=None, model=None, prompt_version=None,
+                       provider=None, run_name=None, no_resume=False, workers=None, limit=None, no_fallback=False), cfg)
+        run = "rule"
+    cmd_build_graph(ns(run=run, backend=None, no_rdf=True), cfg)
+    cmd_train(ns(experiments=["E1", "E2", "E2G"], models=["lr", "xgb"], no_tune=False, run=run, limit=None), cfg)
+    cmd_multiclass(ns(run=run, experiments=None, models=None), cfg)
+    cmd_report(args, cfg)
 
 
 def cmd_report(args, cfg):
@@ -308,7 +333,8 @@ def cmd_predict(args, cfg):
     det = ScamDetector(cfg, args.experiment, args.model, args.extractor)
     res = det.score(text)
     ex = res["explanation"]
-    print(json.dumps({"score": round(res["score"], 4), "is_scam": res["is_scam"], "model": res["model"],
+    caller = {k: res[k] for k in ("caller_type", "caller_type_probs") if k in res}
+    print(json.dumps({"score": round(res["score"], 4), "is_scam": res["is_scam"], "model": res["model"], **caller,
                       "script_path": ex["script_path"], "summary": ex["summary"],
                       "triples": [f"{t['relation']} {t['object']}" for t in res["triples"]],
                       "similar_calls": ex["similar_calls"]}, indent=2))
@@ -377,6 +403,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--n-shifted", type=int, default=240)
     s.add_argument("--n-robocall", type=int, default=120)
     s.set_defaults(fn=cmd_demo_data)
+    s = sub.add_parser("generate-pranks", help="LLM-generated prank calls (+ style controls) for the caller-type task")
+    s.add_argument("--n", type=int, default=120, help="prank calls")
+    s.add_argument("--controls", type=int, default=36, help="fraud / sales calls by the same model (test only)")
+    s.add_argument("--model", default="gemma2:9b")
+    s.add_argument("--provider", default=None)
+    s.add_argument("--out", default=None, help="default: data/pranks/pranks.jsonl")
+    s.set_defaults(fn=cmd_generate_pranks)
     sub.add_parser("preprocess", help="clean, dedupe, unify labels, create splits").set_defaults(fn=cmd_preprocess)
     s = sub.add_parser("eda", help="exploratory data analysis")
     s.add_argument("--run", default=None, help="extraction run for entity statistics")
@@ -460,9 +493,14 @@ def build_parser() -> argparse.ArgumentParser:
         s.add_argument("--limit", type=int, default=None,
                        help="a seeded, label-stratified sample of N calls (per evaluation set for zeroshot)")
         s.set_defaults(fn=fn)
-    s = sub.add_parser("multiclass", help="three-way classification (stretch goal)")
+    s = sub.add_parser("multiclass", help="caller type: fraudster / salesperson / prankster / other legitimate")
     s.add_argument("--run", default=None)
+    s.add_argument("--experiments", nargs="+", default=None, choices=["E1", "E2", "E2G"])
+    s.add_argument("--models", nargs="+", default=None, choices=["lr", "rf"])
     s.set_defaults(fn=cmd_multiclass)
+    s = sub.add_parser("run-multiclass", help="caller-type pipeline end to end (--config config/multiclass.yaml)")
+    s.add_argument("--run", default=None, help="existing extraction run for the KG (default: rule-based)")
+    s.set_defaults(fn=cmd_run_multiclass)
     sub.add_parser("report", help="write results/REPORT.md").set_defaults(fn=cmd_report)
     s = sub.add_parser("predict", help="score a new transcript with a trained model + KG explanation")
     s.add_argument("--text", default=None)

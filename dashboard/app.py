@@ -15,12 +15,13 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scamkg.config import get_paths, load_config  # noqa: E402
-from scamkg.utils import read_jsonl  # noqa: E402
+from scamkg.utils import load_json, read_jsonl  # noqa: E402
 
 EXAMPLE = ("caller: This is Officer Brown from the Social Security Administration. Your SSN has been suspended due "
            "to suspicious activity. To avoid arrest today, you must verify your number and pay a fine using Google "
            "Play gift cards.\nreceiver: Oh no, what do I need to do?")
 CONFIGS = {"real data (config/config.yaml)": None, "real data, rule KG + Ollama (config/local.yaml)": "config/local.yaml",
+           "caller types, with prank calls (config/multiclass.yaml)": "config/multiclass.yaml",
            "synthetic demo (config/demo.yaml)": "config/demo.yaml"}
 
 st.set_page_config(page_title="ScamKG - phone scam detection", layout="wide")
@@ -96,7 +97,7 @@ if "demo" in (cfg_path or ""):
     st.warning("Synthetic demo data: template-generated calls used to exercise the pipeline, not evidence for the RQs.")
 
 tabs = st.tabs(["Overview", "Models (RQ1)", "Cross-dataset (RQ3)", "Extraction (RQ2)", "Clustering (RQ4)",
-                "Ablations", "Call explorer", "Try a transcript"])
+                "Ablations", "Call explorer", "Try a transcript", "Caller types"])
 
 with tabs[0]:
     summ_path = paths.processed / "summary.json"
@@ -262,6 +263,11 @@ with tabs[7]:
                 out = load_detector(cfg_path, e_name, m_name).score(text)
             st.metric("Scam probability", f"{out['score']:.3f}", "SCAM" if out["is_scam"] else "legitimate",
                       delta_color="inverse" if out["is_scam"] else "normal")
+            if "caller_type" in out:
+                probs = out["caller_type_probs"]
+                st.metric("Caller type", out["caller_type"].replace("_", " "),
+                          f"{probs[out['caller_type']]:.0%} ({out['caller_type_model']})", delta_color="off")
+                st.bar_chart(pd.Series(probs, name="probability"))
             ex = out["explanation"]
             st.markdown(f"**Script path:** {ex['script_path'] or '-'}")
             st.markdown(f"**Why:** {ex['summary'] or '-'}")
@@ -270,3 +276,22 @@ with tabs[7]:
                          if out["triples"] else pd.DataFrame(), hide_index=True, width="stretch")
         except FileNotFoundError as e:
             st.error(str(e))
+
+with tabs[8]:
+    mc = csv("multiclass.csv")
+    p = res / "multiclass.json"
+    if mc is None or not p.exists():
+        st.info("No caller-type results here. Run `python -m scamkg --config config/multiclass.yaml run-multiclass` "
+                "and pick that configuration in the sidebar.")
+    else:
+        info = load_json(p)
+        missing = info.get("missing_classes") or []
+        st.write(f"Fraudster / salesperson / prankster / other legitimate. Classes in this run: "
+                 f"{', '.join(info['classes'])}" + (f" (no training calls for {', '.join(missing)})." if missing else ".")
+                 + f" Training calls: {info['n_train']}.")
+        es = st.selectbox("Evaluation set", sorted(mc["eval_set"].unique()), key="caller_type_set")
+        st.dataframe(mc[mc["eval_set"] == es].drop(columns="eval_set").round(3), hide_index=True, width="stretch")
+        cm = info["confusion"].get(f"{info['main'].replace('/', '__')}__{es}")
+        if cm:
+            st.subheader(f"Confusion matrix ({info['main']}, rows = true type)")
+            st.dataframe(pd.DataFrame(cm, index=info["classes"], columns=info["classes"]), width="stretch")

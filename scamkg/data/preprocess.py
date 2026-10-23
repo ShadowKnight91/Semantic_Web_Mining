@@ -74,18 +74,25 @@ def clean_transcript(raw: str) -> tuple[str, str, int]:
     return text, plain.strip(), max(1, len(turns))
 
 
-def assign_splits(df: pd.DataFrame, primary: str, val_size: float, test_size: float, seed: int) -> pd.DataFrame:
+def assign_splits(df: pd.DataFrame, primary: str, val_size: float, test_size: float, seed: int,
+                  also: list[str] | None = None) -> pd.DataFrame:
+    """Stratified train / val / test split of the primary data set; every data set in `also` (e.g. the
+    generated prank calls) is split the same way on its own, so the primary split never changes."""
     df = df.copy()
     df["split"] = "external"
-    prim = df[(df["dataset"] == primary) & (df["label"] >= 0)]
-    if prim.empty:
-        raise RuntimeError(f"Primary data set {primary!r} has no labeled calls")
-    df.loc[(df["dataset"] == primary) & (df["label"] < 0), "split"] = "unlabeled"
-    ids, y = prim.index.to_numpy(), prim["label"].to_numpy()
-    tr, tmp = train_test_split(ids, test_size=val_size + test_size, stratify=y, random_state=seed)
-    y_tmp = df.loc[tmp, "label"].to_numpy()
-    va, te = train_test_split(tmp, test_size=test_size / (val_size + test_size), stratify=y_tmp, random_state=seed)
-    df.loc[tr, "split"], df.loc[va, "split"], df.loc[te, "split"] = "train", "val", "test"
+    for ds in [primary, *[d for d in (also or []) if d != primary]]:
+        part = df[(df["dataset"] == ds) & (df["label"] >= 0)]
+        if part.empty:
+            if ds == primary:
+                raise RuntimeError(f"Primary data set {primary!r} has no labeled calls")
+            continue
+        df.loc[(df["dataset"] == ds) & (df["label"] < 0), "split"] = "unlabeled"
+        ids, y = part.index.to_numpy(), part["label"].to_numpy()
+        tr, tmp = train_test_split(ids, test_size=val_size + test_size, stratify=y, random_state=seed)
+        y_tmp = df.loc[tmp, "label"].to_numpy()
+        va, te = train_test_split(tmp, test_size=test_size / (val_size + test_size), stratify=y_tmp,
+                                  random_state=seed)
+        df.loc[tr, "split"], df.loc[va, "split"], df.loc[te, "split"] = "train", "val", "test"
     return df
 
 
@@ -132,7 +139,7 @@ def preprocess(cfg: dict, paths: Paths) -> pd.DataFrame:
              int(conflict.sum()))
     df = df.set_index("call_id", drop=False)
     df = assign_splits(df, dcfg["primary"], float(dcfg["val_size"]), float(dcfg["test_size"]),
-                       int(cfg["project"]["seed"]))
+                       int(cfg["project"]["seed"]), dcfg.get("split_datasets"))
     cols = ["call_id", "dataset", "source_id", "split", "label", "label3", "subtype", "n_words", "n_turns",
             "text", "text_plain", "gold_triples"]
     paths.processed.mkdir(parents=True, exist_ok=True)

@@ -319,32 +319,97 @@ def loto_summary(df: pd.DataFrame) -> pd.DataFrame:
     return out.sort_values(["held_out", "experiment", "model"], ascending=[False, True, True])
 
 
-def run_multiclass(ctx, experiment: str = "E2") -> dict:
-    """Stretch goal: fraudster / salesperson / prankster / other_legitimate (labels from data or LLM relabeling)."""
+CALLER_TYPES = ["fraudster", "salesperson", "prankster", "other_legitimate"]
+
+
+def make_multiclass_model(name: str, seed: int = 42):
+    if name == "lr":   # lbfgs: liblinear has no multiclass mode
+        return LogisticRegression(C=1.0, class_weight="balanced", max_iter=5000)
+    if name == "rf":
+        return RandomForestClassifier(n_estimators=400, class_weight="balanced_subsample", n_jobs=-1,
+                                      random_state=seed)
+    raise ValueError(f"Caller-type models: lr | rf, not {name!r}")
+
+
+def caller_type_labels(ctx) -> pd.Series:
+    """label3 from the data (BothBosu types, generated pranks) or, if the data has none, from `relabel`."""
     label3 = ctx.calls["label3"].copy()
     llm_file = ctx.paths.processed / "label3_llm.jsonl"
     if (label3 == "").all() and llm_file.exists():
         mapping = {r["call_id"]: r["label3"] for r in read_jsonl(llm_file)}
         label3 = pd.Series([mapping.get(c, "") for c in ctx.calls.index], index=ctx.calls.index)
-    prim = set(ctx.ids(dataset=ctx.primary))
-    has = [c for c in ctx.calls.index if c in prim and label3[c]]
-    if not has:
-        log.warning("No three-way labels: run `python -m scamkg relabel` (LLM-assisted relabeling) first")
-        return {}
-    if EXPERIMENT_SPECS[experiment]["graph"] and ctx.kg is None:
-        experiment = "E1"
+    return label3
+
+
+def _caller_type_metrics(y_true, y_pred, classes: list[str]) -> dict:
+    present = [c for c in classes if c in set(y_true)]
+    rep = classification_report(y_true, y_pred, labels=classes, output_dict=True, zero_division=0)
+    out = {"n": len(y_true), "accuracy": float(np.mean(np.asarray(y_true) == np.asarray(y_pred))),
+           "macro_f1": float(f1_score(y_true, y_pred, labels=present, average="macro", zero_division=0))}
+    for c in classes:
+        out[f"f1_{c}"] = float(rep[c]["f1-score"]) if c in present else np.nan
+    if "prankster" in classes:     # on sets without pranks: how often a call is mistaken for one
+        out["predicted_prankster"] = float(np.mean(np.asarray(y_pred) == "prankster"))
+    return out
+
+
+def run_multiclass(ctx, experiments=None, models=None) -> dict:
+    """Caller-type classification: fraudster / salesperson / prankster / other legitimate (proposal: tell
+    fraudsters, pranksters and salespeople apart). Trained on the train + val calls of every class, scored on
+    the test split and on external sets with caller types (e.g. `pranks_control`). The same feature sets as
+    the binary task (E1 text, E2 text + KG, E2G KG only) show what the knowledge graph adds. The main model
+    (`models.multiclass.main`) is saved for `predict` and the dashboard."""
+    mcfg = ctx.cfg["models"].get("multiclass") or {}
+    wanted = list(mcfg.get("classes") or CALLER_TYPES)
+    experiments = list(experiments or mcfg.get("experiments") or ["E1", "E2", "E2G"])
+    models = list(models or mcfg.get("models") or ["lr"])
+    main = tuple(mcfg.get("main") or ("E2", "lr"))
+    label3 = caller_type_labels(ctx)
     split = ctx.calls["split"]
-    tr = [c for c in has if split[c] in ("train", "val")]
-    te = [c for c in has if split[c] == "test"]
-    fitted, gdf = fit_assembler(ctx, experiment, tr)
-    Xtr, Xte = assemble(ctx, fitted, gdf, tr), assemble(ctx, fitted, gdf, te)
-    model = LogisticRegression(max_iter=5000, class_weight="balanced", C=1.0).fit(Xtr, label3[tr])
-    pred = model.predict(Xte)
-    classes = sorted(set(label3[has]))
-    out = {"experiment": experiment, "n_train": len(tr), "n_test": len(te),
-           "macro_f1": float(f1_score(label3[te], pred, average="macro")),
-           "report": classification_report(label3[te], pred, output_dict=True, zero_division=0),
-           "labels": classes, "confusion_matrix": confusion_matrix(label3[te], pred, labels=classes).tolist()}
+    tr = [c for c in ctx.calls.index if label3[c] in wanted and split[c] in ("train", "val")]
+    if not tr:
+        log.warning("No caller-type labels: run `python -m scamkg relabel` (LLM-assisted relabeling) first")
+        return {}
+    classes = [k for k in wanted if (label3[tr] == k).any()]
+    missing = [k for k in wanted if k not in classes]
+    if missing:
+        log.warning("No training calls for %s, so this run has %d classes%s", missing, len(classes),
+                    " (prank calls: `generate-pranks`, then --config config/multiclass.yaml)"
+                    if "prankster" in missing else "")
+    sets = {"test": [c for c in ctx.calls.index if label3[c] in classes and split[c] == "test"]}
+    for ds in ctx.external_datasets:
+        ids = [c for c in ctx.ids(dataset=ds) if label3[c] in classes]
+        if ids:
+            sets[ds] = ids
+    ytr = label3[tr].to_numpy()
+    rows, confusion = [], {}
+    for exp in experiments:
+        if EXPERIMENT_SPECS[exp]["graph"] and ctx.kg is None:
+            log.warning("%s needs the knowledge graph - skipped", exp)
+            continue
+        fitted, gdf = fit_assembler(ctx, exp, tr)
+        Xtr = assemble(ctx, fitted, gdf, tr)
+        for m in models:
+            model = make_multiclass_model(m, ctx.seed).fit(Xtr, ytr)
+            for name, ids in sets.items():
+                X = assemble(ctx, fitted, gdf, ids)
+                pred, yt = model.predict(X), label3[ids].to_numpy()
+                rows.append({"experiment": exp, "model": m, "eval_set": name, **_caller_type_metrics(yt, pred, classes)})
+                confusion[f"{exp}__{m}__{name}"] = confusion_matrix(yt, pred, labels=classes).tolist()
+                if (exp, m) == main:
+                    prob = pd.DataFrame(model.predict_proba(X), columns=[f"p_{c}" for c in model.classes_])
+                    pd.concat([pd.DataFrame({"call_id": ids, "dataset": ctx.calls.loc[ids, "dataset"].to_numpy(),
+                                             "eval_set": name, "caller_type": yt, "predicted": pred}), prob], axis=1) \
+                        .to_csv(ctx.paths.predictions / f"multiclass__{exp}__{m}__{name}.csv", index=False)
+            if (exp, m) == main:
+                joblib.dump({"experiment": exp, "model_name": m, "fitted": fitted, "model": model, "classes": classes,
+                             "labeled_ids": tr, "run": ctx.run_name}, ctx.paths.models / f"multiclass__{exp}__{m}.joblib")
+            log.info("Caller type %s/%s: %s", exp, m, " | ".join(
+                f"{r['eval_set']} macro-F1 {r['macro_f1']:.3f} acc {r['accuracy']:.3f}" for r in rows[-len(sets):]))
+    pd.DataFrame(rows).to_csv(ctx.paths.results / "multiclass.csv", index=False)
+    out = {"classes": classes, "missing_classes": missing, "main": f"{main[0]}/{main[1]}", "run": ctx.run_name,
+           "n_train": len(tr), "train_counts": pd.Series(ytr).value_counts().to_dict(),
+           "eval_counts": {k: label3[v].value_counts().to_dict() for k, v in sets.items()},
+           "confusion": confusion, "results": rows}
     save_json(ctx.paths.results / "multiclass.json", out)
-    log.info("Three-way classification (%s): macro-F1 %.3f on %d test calls", experiment, out["macro_f1"], len(te))
     return out

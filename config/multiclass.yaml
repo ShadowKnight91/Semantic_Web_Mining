@@ -1,0 +1,41 @@
+# Caller-type classification (proposal: fraudsters vs. pranksters vs. salespeople), plus "other legitimate"
+# calls (deliveries, wrong numbers) so that every call has a class. BothBosu has no prank calls, so this setup
+# adds the generated ones in data/pranks/ (`generate-pranks`). Everything lives in its own folders, so the
+# binary results in results/ and the data in data/processed/ are never touched.
+#   python -m scamkg --config config/multiclass.yaml run-multiclass
+#   python -m scamkg --config config/multiclass.yaml predict --text "..."
+#   python -m scamkg --config config/multiclass.yaml dashboard
+paths:
+  data_processed: data/multiclass/processed
+  kg: data/multiclass/kg
+  cache: data/multiclass/cache
+  annotations: data/multiclass/annotations
+  results: results/multiclass
+  artifacts: artifacts/multiclass
+
+data:
+  load: [bothbosu, pranks]
+  primary: bothbosu
+  split_datasets: [pranks]         # pranks get their own train / val / test split (BothBosu's split is unchanged)
+  external: [pranks_control]       # same-generator fraud / sales calls: a test-only check for generator style
+  mixed_external: []
+  sources:
+    pranks:
+      local_dir: data/pranks
+
+# Rule-based KG: it runs locally on every call, including the generated ones. With Voyager access, extract the
+# same calls with the team's Gemma setup (`extract --extractor llm`) and pass `--run` to use that KG instead.
+extraction:
+  default_run: rule
+
+llm:
+  provider: ollama
+  model: qwen2.5:7b
+  fallback_model: gemma2:9b
+
+models:
+  multiclass:
+    classes: [fraudster, salesperson, prankster, other_legitimate]
+    experiments: [E1, E2, E2G]
+    models: [lr, rf]
+    main: [E2, lr]                 # saved for predict / the dashboard

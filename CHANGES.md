@@ -73,3 +73,24 @@ Tests: 56, all pass.
 50 calls (blind to annotator A and to every extractor), which the course instructor approved. Agreement with A:
 triple F1 0.993 on 50 calls, 3 borderline disagreements. `report` now prints this agreement under the X1 table;
 `data/annotations/PROVENANCE.md` documents both passes and why the number is an upper bound.
+
+## Caller types: fraudster vs. prankster vs. salesperson (proposal)
+
+The proposal asks to tell fraudsters, pranksters and salespeople apart. Only fraudster / salesperson /
+other-legitimate labels existed (BothBosu types), and no data set has a single prank call (Gemma's zero-shot
+categories on ~1,000 real calls contain none either), so the old three-way run was saturated and had no
+prankster class.
+
+| What | Where |
+|---|---|
+| 120 generated prank calls (28 scenarios, several imitating a scam or sales opening) + 36 fraud / sales calls by the same model and prompt template as a test-only style check; `gemma2:9b` via Ollama, seeded and cached | `scamkg/data/pranks.py`, `generate-pranks`, `data/pranks/pranks.jsonl` |
+| `pranks` loader; `data.split_datasets` gives the pranks their own stratified split (BothBosu's split is identical) | `scamkg/data/loaders.py`, `scamkg/data/preprocess.py` |
+| Separate setup, so the binary results and data stay untouched | `config/multiclass.yaml`, `run-multiclass` |
+| Caller-type models: E1 / E2 / E2G x LR / RF, per-class F1, confusion matrices, style check; main model saved | `run_multiclass` in `scamkg/models/classical.py` |
+| `predict` and the dashboard ("Try a transcript", new "Caller types" tab) report the caller type | `scamkg/predict.py`, `dashboard/app.py` |
+
+Results (`results/multiclass/REPORT.md`, rule-based KG): on the test split (240 BothBosu + 18 prank calls) text
+and text + KG models are perfect, so the split cannot separate them. The style check can: text-only models label
+22% (LR) / 53% (RF) of the same-generator fraud / sales calls `prankster`, the KG models 0% (E2 / LR gets all 36
+right; KG-only E2G 97%). The KG alone is weak at telling pranks from other legitimate calls (prankster F1 about
+0.5), because pranks state few ontology facts. Limits: synthetic pranks, 18 test pranks, 36 control calls.

@@ -226,7 +226,22 @@ def load_demo(cfg: dict, paths: Paths) -> pd.DataFrame | None:
     return df[["source_id", "dataset", "raw_text", "label", "subtype", "label3", "gold_triples"]]
 
 
-LOADERS = {"bothbosu": load_bothbosu, "kaggle": load_kaggle, "ncsu": load_ncsu, "demo": load_demo}
+def load_pranks(cfg: dict, paths: Paths) -> pd.DataFrame | None:
+    """LLM-generated prank calls (data set `pranks`) and their same-generator fraud / sales controls
+    (`pranks_control`); see scamkg/data/pranks.py and `python -m scamkg generate-pranks`."""
+    directory = _dir(paths, _src(cfg, "pranks"), "pranks")
+    files = sorted(directory.glob("*.jsonl")) if directory.exists() else []
+    if not files:
+        log.warning("No prank calls in %s - run `python -m scamkg generate-pranks`", directory)
+        return None
+    df = pd.DataFrame([r for f in files for r in read_jsonl(f)])
+    out = pd.concat([_frame(ds, g["raw_text"], g["label"], g["source_id"], g["subtype"]).assign(label3=g["label3"].tolist())
+                     for ds, g in df.groupby("dataset", sort=True)], ignore_index=True)
+    log.info("Pranks: %s", out.groupby(["dataset", "label3"]).size().to_dict())
+    return out
+
+
+LOADERS = {"bothbosu": load_bothbosu, "kaggle": load_kaggle, "ncsu": load_ncsu, "pranks": load_pranks, "demo": load_demo}
 
 
 def load_source(name: str, cfg: dict, paths: Paths) -> pd.DataFrame | None:

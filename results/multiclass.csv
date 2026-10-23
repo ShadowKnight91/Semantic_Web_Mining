@@ -1,0 +1,4 @@
+experiment,model,eval_set,n,accuracy,macro_f1,f1_fraudster,f1_salesperson,f1_other_legitimate
+E1,lr,test,240,1.0,1.0,1.0,1.0,1.0
+E2,lr,test,240,1.0,1.0,1.0,1.0,1.0
+E2G,lr,test,240,1.0,1.0,1.0,1.0,1.0

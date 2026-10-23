@@ -1,61 +1,113 @@
 {
-  "experiment": "E2",
+  "classes": [
+    "fraudster",
+    "salesperson",
+    "other_legitimate"
+  ],
+  "missing_classes": [
+    "prankster"
+  ],
+  "main": "E2/lr",
+  "run": "llm_voyager_gemma4-31b-it_v1_full_fb-qwen3-30b-a3b",
   "n_train": 1358,
-  "n_test": 240,
-  "macro_f1": 1.0,
-  "report": {
-    "fraudster": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 120.0
-    },
-    "other_legitimate": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 53.0
-    },
-    "salesperson": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 67.0
-    },
-    "accuracy": 1.0,
-    "macro avg": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 240.0
-    },
-    "weighted avg": {
-      "precision": 1.0,
-      "recall": 1.0,
-      "f1-score": 1.0,
-      "support": 240.0
+  "train_counts": {
+    "fraudster": 679,
+    "other_legitimate": 346,
+    "salesperson": 333
+  },
+  "eval_counts": {
+    "test": {
+      "fraudster": 120,
+      "salesperson": 67,
+      "other_legitimate": 53
     }
   },
-  "labels": [
-    "fraudster",
-    "other_legitimate",
-    "salesperson"
-  ],
-  "confusion_matrix": [
-    [
-      120,
-      0,
-      0
+  "confusion": {
+    "E1__lr__test": [
+      [
+        120,
+        0,
+        0
+      ],
+      [
+        0,
+        67,
+        0
+      ],
+      [
+        0,
+        0,
+        53
+      ]
     ],
-    [
-      0,
-      53,
-      0
+    "E2__lr__test": [
+      [
+        120,
+        0,
+        0
+      ],
+      [
+        0,
+        67,
+        0
+      ],
+      [
+        0,
+        0,
+        53
+      ]
     ],
-    [
-      0,
-      0,
-      67
+    "E2G__lr__test": [
+      [
+        120,
+        0,
+        0
+      ],
+      [
+        0,
+        67,
+        0
+      ],
+      [
+        0,
+        0,
+        53
+      ]
     ]
+  },
+  "results": [
+    {
+      "experiment": "E1",
+      "model": "lr",
+      "eval_set": "test",
+      "n": 240,
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "f1_fraudster": 1.0,
+      "f1_salesperson": 1.0,
+      "f1_other_legitimate": 1.0
+    },
+    {
+      "experiment": "E2",
+      "model": "lr",
+      "eval_set": "test",
+      "n": 240,
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "f1_fraudster": 1.0,
+      "f1_salesperson": 1.0,
+      "f1_other_legitimate": 1.0
+    },
+    {
+      "experiment": "E2G",
+      "model": "lr",
+      "eval_set": "test",
+      "n": 240,
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "f1_fraudster": 1.0,
+      "f1_salesperson": 1.0,
+      "f1_other_legitimate": 1.0
+    }
   ]
 }
