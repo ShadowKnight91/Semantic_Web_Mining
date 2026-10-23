@@ -197,6 +197,24 @@ Extraction run used for the KG: `llm_voyager_gemma4-31b-it_v1_full_fb-qwen3-30b-
 | E2G | xgb | 0.999 | 0.003 | 1.000 | 0.000 | 0.999 | 0.001 | 1.000 | 0.000 | 1.000 | 0.000 | 1.000 | 0.000 | 0.999 | 0.001 |
 
 
+## Leave-one-type-out (flag rate = recall on unseen scam types, false-positive rate on unseen legitimate types)
+
+| held_out | experiment | model | held_out_flag_rate | pr_auc | roc_auc |
+|---|---|---|---|---|---|
+| scam | E1 | lr | 0.985 | 1.000 | 1.000 |
+| scam | E1 | xgb | 0.919 | 1.000 | 0.999 |
+| scam | E2 | lr | 0.961 | 1.000 | 1.000 |
+| scam | E2 | xgb | 0.761 | 0.966 | 0.955 |
+| scam | E2G | lr | 0.961 | 1.000 | 1.000 |
+| scam | E2G | xgb | 0.761 | 0.966 | 0.955 |
+| legit | E1 | lr | 0.149 | 1.000 | 1.000 |
+| legit | E1 | xgb | 0.219 | 0.998 | 0.999 |
+| legit | E2 | lr | 0.086 | 1.000 | 1.000 |
+| legit | E2 | xgb | 0.009 | 1.000 | 1.000 |
+| legit | E2G | lr | 0.086 | 1.000 | 1.000 |
+| legit | E2G | xgb | 0.009 | 1.000 | 1.000 |
+
+
 ## McNemar tests (E1 vs graph-enhanced)
 
 | model | baseline | challenger | eval_set | n | b_only_correct | a_only_correct | statistic | p_value | method | significant_0.05 |
@@ -436,3 +454,8 @@ The BothBosu test split is saturated (all deltas 0); negative values mean the re
 | ncsu+kaggle | entity_type | RequestedAsset | E2G | xgb | 0.860 | 0.045 | -0.537 |
 | ncsu+kaggle | entity_type | PaymentChannel | E2G | xgb | 0.894 | 0.078 | -0.007 |
 | ncsu+kaggle | entity_type | ClaimedIdentity | E2G | xgb | 0.956 | 0.140 | -0.080 |
+
+
+## Three-way classification (stretch goal)
+
+Macro-F1 1.000 on 240 test calls. Limitation: BothBosu has no prankster calls, so the classes are fraudster / salesperson / other legitimate, and the synthetic test split is saturated.

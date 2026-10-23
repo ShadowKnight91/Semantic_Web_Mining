@@ -7,6 +7,10 @@
 #   python -m scamkg --config config/local.yaml predict --text "..."
 # `predict --extractor llm` extracts the new call with llm.model (start Ollama first); the KG itself stays
 # rule-based, so predict warns that the two are not comparable.
+# Results go to results/local/, so they never overwrite the team's committed Gemma results in results/.
+paths:
+  results: results/local
+
 extraction:
   default_run: rule
 
