@@ -55,6 +55,8 @@ Extraction run used for the KG: `llm_voyager_gemma4-31b-it_v1_full_fb-qwen3-30b-
 
 ## Cross-dataset generalization (X2)
 
+Note: the LLM zero-shot rows use a stratified sample of each external set (see `n`); the same-subset table below scores every model on exactly those calls.
+
 | eval_set | experiment | model | n | precision | recall | f1 | pr_auc | roc_auc | recall_at_fpr10 |
 |---|---|---|---|---|---|---|---|---|---|
 | kaggle | E1 | lr | 793 | 0.938 | 0.458 | 0.615 | 0.846 | 0.818 | 0.598 |
@@ -177,6 +179,69 @@ Extraction run used for the KG: `llm_voyager_gemma4-31b-it_v1_full_fb-qwen3-30b-
 | LLM | zeroshot_gemma4-31b-it | kaggle | 0.852 | 0.148 | 0.953 | 0.047 |
 | LLM | zeroshot_gemma4-31b-it | ncsu | 0.920 | 0.080 |  |  |
 | LLM | zeroshot_gemma4-31b-it | ncsu+kaggle | 0.920 | 0.080 | 0.989 | 0.011 |
+
+
+### Same-subset comparison (every model on the calls the zero-shot LLM saw)
+
+| eval_set | experiment | model | n | precision | recall | f1 | pr_auc |
+|---|---|---|---|---|---|---|---|
+| kaggle | E1 | lr | 367 | 0.882 | 0.450 | 0.596 | 0.791 |
+| kaggle | E1 | rf | 367 | 1.000 | 0.027 | 0.052 | 0.872 |
+| kaggle | E1 | svm | 367 | 0.862 | 0.376 | 0.523 | 0.790 |
+| kaggle | E1 | xgb | 367 | 1.000 | 0.067 | 0.126 | 0.778 |
+| kaggle | E2 | lr | 367 | 0.777 | 0.584 | 0.667 | 0.846 |
+| kaggle | E2 | rf | 367 | 0.859 | 0.409 | 0.555 | 0.843 |
+| kaggle | E2 | svm | 367 | 0.814 | 0.557 | 0.661 | 0.854 |
+| kaggle | E2 | xgb | 367 | 0.714 | 0.436 | 0.542 | 0.626 |
+| kaggle | E2G | lr | 367 | 0.782 | 0.577 | 0.664 | 0.848 |
+| kaggle | E2G | rf | 367 | 0.741 | 0.537 | 0.623 | 0.805 |
+| kaggle | E2G | svm | 367 | 0.854 | 0.550 | 0.669 | 0.861 |
+| kaggle | E2G | xgb | 367 | 0.714 | 0.436 | 0.542 | 0.613 |
+| kaggle | E3 | distilbert | 367 | 0.613 | 0.745 | 0.673 | 0.755 |
+| kaggle | E3 | sbert_mlp | 367 | 0.467 | 0.711 | 0.564 | 0.673 |
+| kaggle | E4 | graphsage | 367 | 0.890 | 0.597 | 0.715 | 0.894 |
+| kaggle | E4 | graphsage_text | 367 | 0.859 | 0.738 | 0.794 | 0.890 |
+| kaggle | E4 | graphsage_topo | 367 | 0.968 | 0.409 | 0.575 | 0.931 |
+| kaggle | E4 | graphsage_xgb | 367 | 0.882 | 0.503 | 0.641 | 0.738 |
+| kaggle | LLM | zeroshot_gemma4-31b-it | 367 | 0.962 | 0.852 | 0.904 | 0.953 |
+| ncsu | E1 | lr | 414 | 1.000 | 0.457 | 0.627 |  |
+| ncsu | E1 | rf | 414 | 1.000 | 0.017 | 0.033 |  |
+| ncsu | E1 | svm | 414 | 1.000 | 0.442 | 0.613 |  |
+| ncsu | E1 | xgb | 414 | 1.000 | 0.017 | 0.033 |  |
+| ncsu | E2 | lr | 414 | 1.000 | 0.802 | 0.890 |  |
+| ncsu | E2 | rf | 414 | 1.000 | 0.415 | 0.587 |  |
+| ncsu | E2 | svm | 414 | 1.000 | 0.804 | 0.892 |  |
+| ncsu | E2 | xgb | 414 | 1.000 | 0.744 | 0.853 |  |
+| ncsu | E2G | lr | 414 | 1.000 | 0.802 | 0.890 |  |
+| ncsu | E2G | rf | 414 | 1.000 | 0.771 | 0.870 |  |
+| ncsu | E2G | svm | 414 | 1.000 | 0.792 | 0.884 |  |
+| ncsu | E2G | xgb | 414 | 1.000 | 0.744 | 0.853 |  |
+| ncsu | E3 | distilbert | 414 | 1.000 | 0.792 | 0.884 |  |
+| ncsu | E3 | sbert_mlp | 414 | 1.000 | 0.908 | 0.952 |  |
+| ncsu | E4 | graphsage | 414 | 1.000 | 0.729 | 0.844 |  |
+| ncsu | E4 | graphsage_text | 414 | 1.000 | 0.850 | 0.919 |  |
+| ncsu | E4 | graphsage_topo | 414 | 1.000 | 0.143 | 0.249 |  |
+| ncsu | E4 | graphsage_xgb | 414 | 1.000 | 0.657 | 0.793 |  |
+| ncsu | LLM | zeroshot_gemma4-31b-it | 414 | 1.000 | 0.920 | 0.958 |  |
+| ncsu+kaggle | E1 | lr | 632 | 0.955 | 0.457 | 0.618 | 0.925 |
+| ncsu+kaggle | E1 | rf | 632 | 1.000 | 0.017 | 0.033 | 0.940 |
+| ncsu+kaggle | E1 | svm | 632 | 0.953 | 0.442 | 0.604 | 0.927 |
+| ncsu+kaggle | E1 | xgb | 632 | 1.000 | 0.017 | 0.033 | 0.844 |
+| ncsu+kaggle | E2 | lr | 632 | 0.930 | 0.802 | 0.861 | 0.964 |
+| ncsu+kaggle | E2 | rf | 632 | 0.945 | 0.415 | 0.577 | 0.944 |
+| ncsu+kaggle | E2 | svm | 632 | 0.946 | 0.804 | 0.869 | 0.969 |
+| ncsu+kaggle | E2 | xgb | 632 | 0.922 | 0.744 | 0.824 | 0.848 |
+| ncsu+kaggle | E2G | lr | 632 | 0.933 | 0.802 | 0.862 | 0.965 |
+| ncsu+kaggle | E2G | rf | 632 | 0.919 | 0.771 | 0.838 | 0.927 |
+| ncsu+kaggle | E2G | svm | 632 | 0.959 | 0.792 | 0.868 | 0.967 |
+| ncsu+kaggle | E2G | xgb | 632 | 0.922 | 0.744 | 0.824 | 0.821 |
+| ncsu+kaggle | E3 | distilbert | 632 | 0.824 | 0.792 | 0.808 | 0.895 |
+| ncsu+kaggle | E3 | sbert_mlp | 632 | 0.757 | 0.908 | 0.825 | 0.912 |
+| ncsu+kaggle | E4 | graphsage | 632 | 0.965 | 0.729 | 0.831 | 0.973 |
+| ncsu+kaggle | E4 | graphsage_text | 632 | 0.951 | 0.850 | 0.898 | 0.973 |
+| ncsu+kaggle | E4 | graphsage_topo | 632 | 0.967 | 0.143 | 0.248 | 0.946 |
+| ncsu+kaggle | E4 | graphsage_xgb | 632 | 0.965 | 0.657 | 0.782 | 0.912 |
+| ncsu+kaggle | LLM | zeroshot_gemma4-31b-it | 632 | 0.987 | 0.920 | 0.953 | 0.989 |
 
 
 ## 5-fold stratified cross-validation (mean / std)
