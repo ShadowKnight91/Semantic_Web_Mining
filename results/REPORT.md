@@ -286,55 +286,153 @@ Topology features: `het_degree`, `het_pagerank`, `het_betweenness`, `cc_degree`,
 | 5 | 5 | 0.000 | relative_or_friend -> personal_info | wrong (80%) |
 
 
-## Ablations (test split, delta vs. full model)
+## Ablations (cross-dataset sets, delta vs. full model)
 
-| ablation | removed | experiment | model | pr_auc | delta_pr_auc | delta_recall |
-|---|---|---|---|---|---|---|
-| entity_type | ClaimedIdentity | E2 | lr | 1.000 | 0.000 | 0.000 |
-| entity_type | ClaimedIdentity | E2 | xgb | 1.000 | 0.000 | 0.000 |
-| entity_type | ClaimedIdentity | E2G | lr | 1.000 | -0.000 | 0.000 |
-| entity_type | ClaimedIdentity | E2G | xgb | 1.000 | 0.000 | 0.000 |
-| entity_type | Organization | E2 | lr | 1.000 | 0.000 | 0.000 |
-| entity_type | Organization | E2 | xgb | 1.000 | 0.000 | -0.008 |
-| entity_type | Organization | E2G | lr | 1.000 | 0.000 | 0.000 |
-| entity_type | Organization | E2G | xgb | 1.000 | 0.000 | -0.008 |
-| entity_type | PressureTactic | E2 | lr | 1.000 | 0.000 | 0.000 |
-| entity_type | PressureTactic | E2 | xgb | 1.000 | 0.000 | 0.000 |
-| entity_type | PressureTactic | E2G | lr | 1.000 | 0.000 | 0.000 |
-| entity_type | PressureTactic | E2G | xgb | 1.000 | 0.000 | 0.000 |
-| entity_type | RequestedAsset | E2 | lr | 1.000 | 0.000 | 0.000 |
-| entity_type | RequestedAsset | E2 | xgb | 1.000 | 0.000 | 0.000 |
-| entity_type | RequestedAsset | E2G | lr | 1.000 | -0.000 | 0.000 |
-| entity_type | RequestedAsset | E2G | xgb | 1.000 | 0.000 | 0.000 |
-| entity_type | PaymentChannel | E2 | lr | 1.000 | 0.000 | 0.000 |
-| entity_type | PaymentChannel | E2 | xgb | 1.000 | 0.000 | 0.000 |
-| entity_type | PaymentChannel | E2G | lr | 1.000 | 0.000 | 0.000 |
-| entity_type | PaymentChannel | E2G | xgb | 1.000 | 0.000 | 0.000 |
-| entity_type | CallbackNumber | E2 | lr | 1.000 | 0.000 | 0.000 |
-| entity_type | CallbackNumber | E2 | xgb | 1.000 | 0.000 | 0.000 |
-| entity_type | CallbackNumber | E2G | lr | 1.000 | -0.000 | 0.000 |
-| entity_type | CallbackNumber | E2G | xgb | 1.000 | 0.000 | 0.000 |
-| feature_group | structural | E2 | lr | 1.000 | 0.000 | 0.000 |
-| feature_group | structural | E2 | xgb | 1.000 | 0.000 | 0.000 |
-| feature_group | structural | E2G | lr | 1.000 | 0.000 | 0.000 |
-| feature_group | structural | E2G | xgb | 1.000 | 0.000 | 0.000 |
-| feature_group | community | E2 | lr | 1.000 | 0.000 | 0.000 |
-| feature_group | community | E2 | xgb | 1.000 | 0.000 | 0.000 |
-| feature_group | community | E2G | lr | 1.000 | 0.000 | 0.000 |
-| feature_group | community | E2G | xgb | 1.000 | 0.000 | 0.000 |
-| feature_group | similarity | E2 | lr | 1.000 | 0.000 | 0.000 |
-| feature_group | similarity | E2 | xgb | 1.000 | 0.000 | 0.000 |
-| feature_group | similarity | E2G | lr | 1.000 | 0.000 | 0.000 |
-| feature_group | similarity | E2G | xgb | 1.000 | -0.000 | 0.000 |
-| feature_group | entity_risk | E2 | lr | 1.000 | 0.000 | 0.000 |
-| feature_group | entity_risk | E2 | xgb | 1.000 | 0.000 | 0.000 |
-| feature_group | entity_risk | E2G | lr | 1.000 | 0.000 | 0.000 |
-| feature_group | entity_risk | E2G | xgb | 1.000 | 0.000 | 0.000 |
-| feature_group | relation_counts | E2 | lr | 1.000 | 0.000 | 0.000 |
-| feature_group | relation_counts | E2 | xgb | 1.000 | 0.000 | 0.000 |
-| feature_group | relation_counts | E2G | lr | 1.000 | 0.000 | 0.000 |
-| feature_group | relation_counts | E2G | xgb | 1.000 | 0.000 | 0.000 |
-| feature_group | ontology_onehot | E2 | lr | 1.000 | 0.000 | 0.000 |
-| feature_group | ontology_onehot | E2 | xgb | 1.000 | 0.000 | 0.000 |
-| feature_group | ontology_onehot | E2G | lr | 1.000 | 0.000 | 0.000 |
-| feature_group | ontology_onehot | E2G | xgb | 1.000 | 0.000 | 0.000 |
+The BothBosu test split is saturated (all deltas 0); negative values mean the removed part helped.
+
+| eval_set | ablation | removed | experiment | model | pr_auc | delta_pr_auc | delta_recall |
+|---|---|---|---|---|---|---|---|
+| kaggle | entity_type | PressureTactic | E2 | lr | 0.770 | -0.118 | -0.186 |
+| kaggle | entity_type | RequestedAsset | E2 | lr | 0.825 | -0.063 | 0.076 |
+| kaggle | entity_type | Organization | E2 | lr | 0.836 | -0.052 | -0.064 |
+| kaggle | feature_group | relation_counts | E2 | lr | 0.862 | -0.026 | 0.033 |
+| kaggle | feature_group | structural | E2 | lr | 0.863 | -0.025 | -0.043 |
+| kaggle | entity_type | PaymentChannel | E2 | lr | 0.882 | -0.006 | 0.059 |
+| kaggle | feature_group | similarity | E2 | lr | 0.882 | -0.006 | -0.046 |
+| kaggle | feature_group | entity_risk | E2 | lr | 0.887 | -0.001 | 0.033 |
+| kaggle | feature_group | ontology_onehot | E2 | lr | 0.890 | 0.002 | 0.010 |
+| kaggle | feature_group | community | E2 | lr | 0.894 | 0.006 | 0.053 |
+| kaggle | entity_type | CallbackNumber | E2 | lr | 0.896 | 0.008 | 0.031 |
+| kaggle | entity_type | ClaimedIdentity | E2 | lr | 0.962 | 0.074 | 0.155 |
+| kaggle | entity_type | RequestedAsset | E2 | xgb | 0.666 | -0.043 | -0.249 |
+| kaggle | entity_type | Organization | E2 | xgb | 0.688 | -0.020 | -0.010 |
+| kaggle | feature_group | structural | E2 | xgb | 0.697 | -0.011 | 0.000 |
+| kaggle | feature_group | community | E2 | xgb | 0.700 | -0.009 | 0.000 |
+| kaggle | feature_group | relation_counts | E2 | xgb | 0.709 | 0.000 | 0.000 |
+| kaggle | feature_group | entity_risk | E2 | xgb | 0.710 | 0.001 | 0.000 |
+| kaggle | entity_type | PressureTactic | E2 | xgb | 0.714 | 0.005 | -0.041 |
+| kaggle | feature_group | ontology_onehot | E2 | xgb | 0.717 | 0.009 | 0.000 |
+| kaggle | entity_type | CallbackNumber | E2 | xgb | 0.724 | 0.015 | -0.038 |
+| kaggle | entity_type | PaymentChannel | E2 | xgb | 0.756 | 0.048 | 0.066 |
+| kaggle | feature_group | similarity | E2 | xgb | 0.784 | 0.075 | 0.089 |
+| kaggle | entity_type | ClaimedIdentity | E2 | xgb | 0.953 | 0.244 | 0.165 |
+| kaggle | entity_type | PressureTactic | E2G | lr | 0.770 | -0.119 | -0.186 |
+| kaggle | entity_type | RequestedAsset | E2G | lr | 0.827 | -0.062 | 0.069 |
+| kaggle | entity_type | Organization | E2G | lr | 0.837 | -0.053 | -0.064 |
+| kaggle | feature_group | relation_counts | E2G | lr | 0.862 | -0.028 | 0.041 |
+| kaggle | feature_group | structural | E2G | lr | 0.866 | -0.024 | -0.056 |
+| kaggle | entity_type | PaymentChannel | E2G | lr | 0.884 | -0.006 | 0.053 |
+| kaggle | feature_group | similarity | E2G | lr | 0.884 | -0.006 | -0.053 |
+| kaggle | feature_group | entity_risk | E2G | lr | 0.889 | -0.001 | 0.028 |
+| kaggle | feature_group | ontology_onehot | E2G | lr | 0.891 | 0.002 | 0.005 |
+| kaggle | feature_group | community | E2G | lr | 0.896 | 0.007 | 0.051 |
+| kaggle | entity_type | CallbackNumber | E2G | lr | 0.897 | 0.008 | 0.028 |
+| kaggle | entity_type | ClaimedIdentity | E2G | lr | 0.961 | 0.072 | 0.155 |
+| kaggle | entity_type | PressureTactic | E2G | xgb | 0.631 | -0.067 | -0.018 |
+| kaggle | entity_type | Organization | E2G | xgb | 0.678 | -0.020 | -0.010 |
+| kaggle | entity_type | RequestedAsset | E2G | xgb | 0.691 | -0.006 | -0.249 |
+| kaggle | feature_group | community | E2G | xgb | 0.700 | 0.003 | 0.000 |
+| kaggle | feature_group | ontology_onehot | E2G | xgb | 0.700 | 0.003 | 0.000 |
+| kaggle | feature_group | entity_risk | E2G | xgb | 0.708 | 0.010 | 0.000 |
+| kaggle | feature_group | structural | E2G | xgb | 0.710 | 0.012 | 0.000 |
+| kaggle | feature_group | relation_counts | E2G | xgb | 0.717 | 0.019 | 0.000 |
+| kaggle | entity_type | CallbackNumber | E2G | xgb | 0.725 | 0.027 | -0.038 |
+| kaggle | entity_type | PaymentChannel | E2G | xgb | 0.794 | 0.097 | 0.066 |
+| kaggle | feature_group | similarity | E2G | xgb | 0.827 | 0.130 | 0.084 |
+| kaggle | entity_type | ClaimedIdentity | E2G | xgb | 0.967 | 0.269 | 0.249 |
+| ncsu | entity_type | ClaimedIdentity | E2 | lr |  |  | -0.137 |
+| ncsu | entity_type | Organization | E2 | lr |  |  | -0.013 |
+| ncsu | entity_type | PressureTactic | E2 | lr |  |  | -0.258 |
+| ncsu | entity_type | RequestedAsset | E2 | lr |  |  | 0.049 |
+| ncsu | entity_type | PaymentChannel | E2 | lr |  |  | -0.036 |
+| ncsu | entity_type | CallbackNumber | E2 | lr |  |  | -0.020 |
+| ncsu | feature_group | structural | E2 | lr |  |  | -0.060 |
+| ncsu | feature_group | community | E2 | lr |  |  | 0.017 |
+| ncsu | feature_group | similarity | E2 | lr |  |  | -0.080 |
+| ncsu | feature_group | entity_risk | E2 | lr |  |  | 0.011 |
+| ncsu | feature_group | relation_counts | E2 | lr |  |  | 0.000 |
+| ncsu | feature_group | ontology_onehot | E2 | lr |  |  | 0.004 |
+| ncsu | entity_type | ClaimedIdentity | E2 | xgb |  |  | -0.108 |
+| ncsu | entity_type | Organization | E2 | xgb |  |  | -0.137 |
+| ncsu | entity_type | PressureTactic | E2 | xgb |  |  | -0.212 |
+| ncsu | entity_type | RequestedAsset | E2 | xgb |  |  | -0.537 |
+| ncsu | entity_type | PaymentChannel | E2 | xgb |  |  | -0.007 |
+| ncsu | entity_type | CallbackNumber | E2 | xgb |  |  | -0.013 |
+| ncsu | feature_group | structural | E2 | xgb |  |  | 0.000 |
+| ncsu | feature_group | community | E2 | xgb |  |  | 0.000 |
+| ncsu | feature_group | similarity | E2 | xgb |  |  | -0.032 |
+| ncsu | feature_group | entity_risk | E2 | xgb |  |  | 0.000 |
+| ncsu | feature_group | relation_counts | E2 | xgb |  |  | 0.000 |
+| ncsu | feature_group | ontology_onehot | E2 | xgb |  |  | 0.000 |
+| ncsu | entity_type | ClaimedIdentity | E2G | lr |  |  | -0.135 |
+| ncsu | entity_type | Organization | E2G | lr |  |  | -0.011 |
+| ncsu | entity_type | PressureTactic | E2G | lr |  |  | -0.257 |
+| ncsu | entity_type | RequestedAsset | E2G | lr |  |  | 0.052 |
+| ncsu | entity_type | PaymentChannel | E2G | lr |  |  | -0.035 |
+| ncsu | entity_type | CallbackNumber | E2G | lr |  |  | -0.022 |
+| ncsu | feature_group | structural | E2G | lr |  |  | -0.058 |
+| ncsu | feature_group | community | E2G | lr |  |  | 0.018 |
+| ncsu | feature_group | similarity | E2G | lr |  |  | -0.080 |
+| ncsu | feature_group | entity_risk | E2G | lr |  |  | 0.013 |
+| ncsu | feature_group | relation_counts | E2G | lr |  |  | 0.001 |
+| ncsu | feature_group | ontology_onehot | E2G | lr |  |  | 0.006 |
+| ncsu | entity_type | ClaimedIdentity | E2G | xgb |  |  | -0.080 |
+| ncsu | entity_type | Organization | E2G | xgb |  |  | -0.137 |
+| ncsu | entity_type | PressureTactic | E2G | xgb |  |  | -0.160 |
+| ncsu | entity_type | RequestedAsset | E2G | xgb |  |  | -0.537 |
+| ncsu | entity_type | PaymentChannel | E2G | xgb |  |  | -0.007 |
+| ncsu | entity_type | CallbackNumber | E2G | xgb |  |  | -0.013 |
+| ncsu | feature_group | structural | E2G | xgb |  |  | 0.000 |
+| ncsu | feature_group | community | E2G | xgb |  |  | 0.000 |
+| ncsu | feature_group | similarity | E2G | xgb |  |  | -0.066 |
+| ncsu | feature_group | entity_risk | E2G | xgb |  |  | 0.000 |
+| ncsu | feature_group | relation_counts | E2G | xgb |  |  | 0.000 |
+| ncsu | feature_group | ontology_onehot | E2G | xgb |  |  | 0.000 |
+| ncsu+kaggle | entity_type | PressureTactic | E2 | lr | 0.867 | -0.090 | -0.258 |
+| ncsu+kaggle | entity_type | Organization | E2 | lr | 0.912 | -0.046 | -0.013 |
+| ncsu+kaggle | feature_group | similarity | E2 | lr | 0.925 | -0.033 | -0.080 |
+| ncsu+kaggle | feature_group | structural | E2 | lr | 0.928 | -0.030 | -0.060 |
+| ncsu+kaggle | entity_type | RequestedAsset | E2 | lr | 0.938 | -0.019 | 0.049 |
+| ncsu+kaggle | feature_group | relation_counts | E2 | lr | 0.945 | -0.012 | 0.000 |
+| ncsu+kaggle | entity_type | CallbackNumber | E2 | lr | 0.946 | -0.011 | -0.020 |
+| ncsu+kaggle | entity_type | PaymentChannel | E2 | lr | 0.949 | -0.008 | -0.036 |
+| ncsu+kaggle | feature_group | entity_risk | E2 | lr | 0.961 | 0.003 | 0.011 |
+| ncsu+kaggle | feature_group | ontology_onehot | E2 | lr | 0.961 | 0.004 | 0.004 |
+| ncsu+kaggle | feature_group | community | E2 | lr | 0.968 | 0.010 | 0.017 |
+| ncsu+kaggle | entity_type | ClaimedIdentity | E2 | lr | 0.969 | 0.011 | -0.137 |
+| ncsu+kaggle | feature_group | structural | E2 | xgb | 0.816 | -0.027 | 0.000 |
+| ncsu+kaggle | entity_type | RequestedAsset | E2 | xgb | 0.822 | -0.020 | -0.537 |
+| ncsu+kaggle | feature_group | similarity | E2 | xgb | 0.833 | -0.010 | -0.032 |
+| ncsu+kaggle | entity_type | Organization | E2 | xgb | 0.840 | -0.003 | -0.137 |
+| ncsu+kaggle | feature_group | entity_risk | E2 | xgb | 0.842 | -0.001 | 0.000 |
+| ncsu+kaggle | feature_group | relation_counts | E2 | xgb | 0.842 | 0.000 | 0.000 |
+| ncsu+kaggle | entity_type | CallbackNumber | E2 | xgb | 0.847 | 0.004 | -0.013 |
+| ncsu+kaggle | feature_group | community | E2 | xgb | 0.851 | 0.008 | 0.000 |
+| ncsu+kaggle | feature_group | ontology_onehot | E2 | xgb | 0.860 | 0.018 | 0.000 |
+| ncsu+kaggle | entity_type | PressureTactic | E2 | xgb | 0.869 | 0.026 | -0.212 |
+| ncsu+kaggle | entity_type | PaymentChannel | E2 | xgb | 0.872 | 0.030 | -0.007 |
+| ncsu+kaggle | entity_type | ClaimedIdentity | E2 | xgb | 0.933 | 0.091 | -0.108 |
+| ncsu+kaggle | entity_type | PressureTactic | E2G | lr | 0.867 | -0.092 | -0.257 |
+| ncsu+kaggle | entity_type | Organization | E2G | lr | 0.913 | -0.045 | -0.011 |
+| ncsu+kaggle | feature_group | similarity | E2G | lr | 0.926 | -0.032 | -0.080 |
+| ncsu+kaggle | feature_group | structural | E2G | lr | 0.930 | -0.028 | -0.058 |
+| ncsu+kaggle | entity_type | RequestedAsset | E2G | lr | 0.938 | -0.020 | 0.052 |
+| ncsu+kaggle | feature_group | relation_counts | E2G | lr | 0.945 | -0.013 | 0.001 |
+| ncsu+kaggle | entity_type | CallbackNumber | E2G | lr | 0.947 | -0.012 | -0.022 |
+| ncsu+kaggle | entity_type | PaymentChannel | E2G | lr | 0.951 | -0.008 | -0.035 |
+| ncsu+kaggle | feature_group | entity_risk | E2G | lr | 0.961 | 0.003 | 0.013 |
+| ncsu+kaggle | feature_group | ontology_onehot | E2G | lr | 0.962 | 0.004 | 0.006 |
+| ncsu+kaggle | entity_type | ClaimedIdentity | E2G | lr | 0.968 | 0.009 | -0.135 |
+| ncsu+kaggle | feature_group | community | E2G | lr | 0.969 | 0.010 | 0.018 |
+| ncsu+kaggle | entity_type | PressureTactic | E2G | xgb | 0.818 | 0.002 | -0.160 |
+| ncsu+kaggle | entity_type | Organization | E2G | xgb | 0.830 | 0.015 | -0.137 |
+| ncsu+kaggle | feature_group | structural | E2G | xgb | 0.842 | 0.026 | 0.000 |
+| ncsu+kaggle | feature_group | entity_risk | E2G | xgb | 0.843 | 0.028 | 0.000 |
+| ncsu+kaggle | feature_group | relation_counts | E2G | xgb | 0.845 | 0.029 | 0.000 |
+| ncsu+kaggle | entity_type | CallbackNumber | E2G | xgb | 0.848 | 0.033 | -0.013 |
+| ncsu+kaggle | feature_group | ontology_onehot | E2G | xgb | 0.850 | 0.035 | 0.000 |
+| ncsu+kaggle | feature_group | similarity | E2G | xgb | 0.855 | 0.040 | -0.066 |
+| ncsu+kaggle | feature_group | community | E2G | xgb | 0.859 | 0.043 | 0.000 |
+| ncsu+kaggle | entity_type | RequestedAsset | E2G | xgb | 0.860 | 0.045 | -0.537 |
+| ncsu+kaggle | entity_type | PaymentChannel | E2G | xgb | 0.894 | 0.078 | -0.007 |
+| ncsu+kaggle | entity_type | ClaimedIdentity | E2G | xgb | 0.956 | 0.140 | -0.080 |
