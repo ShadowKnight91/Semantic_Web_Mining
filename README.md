@@ -24,6 +24,44 @@ flowchart LR
   L --> M[REPORT.md + Streamlit dashboard]
 ```
 
+## Repository structure: CODE / DATA / EVALUATIONS
+
+| Part | Folders | Contents |
+|---|---|---|
+| **CODE** | `scamkg/`, `dashboard/`, `tests/`, `config/`, `ontology/`, `neo4j/queries.cypher` | pipeline package (`python -m scamkg --help`), Streamlit dashboard, test suite, configs, ontology (YAML + OWL + SHACL + SPARQL) |
+| **DATA** | `data/annotations/`, `data/kg/extractions/`, `data/pranks/`, `neo4j/dumps/neo4j.dump` | 50-call annotation sample with annotators A and B (see `data/annotations/PROVENANCE.md`), LLM extraction runs, generated prank calls, Neo4j database dump. Raw data sets are not redistributed (Kaggle is CC BY-NC-ND): `python -m scamkg download` fetches BothBosu and NCSU; Kaggle is downloaded by hand (see Running on the real data) |
+| **EVALUATIONS** | `results/` | `REPORT.md` (every table), `metrics.csv`, `generalization.csv`, `significance.csv`, `cv_results.csv`, `ablation.csv`, `extraction_quality.csv`, `zeroshot_same_subset.csv`, `loto.csv`, `clustering.json`, `graphsage_fusion.json`, `explanations.jsonl`, `predictions/`, `figures/`, `eda/`, `multiclass/` |
+
+## How the reported results were produced
+
+* **Extraction:** Gemma 4 31B (`gemma4-31b-it`) on ASU Voyager, prompt `v1_full`, temperature 0.1, seed 42, with
+  `qwen3-30b-a3b` as fallback, on all 3,104 calls. Qwen3-30B and the prompt variants `v0_open`,
+  `v2_no_descriptors`, `v3_no_example` were run with `--no-fallback` on the test split plus the 50 annotated calls.
+* **Preprocessing:** 1,600 BothBosu, 793 Kaggle and 1,378 English NCSU transcripts; after removing
+  duplicates and calls under 5 words: 1,598 / 793 / 713 calls (3,104 in total).
+* **Commands:** `preprocess`, `eda`, `extract --extractor rule`, `extract --extractor llm`, `build-graph`
+  (networkx, then `--backend neo4j`), `train --experiments E1 E2 E2G E3 E4 E5`, `cv`, `loto`, `significance`,
+  `ablate`, `explain`, `zeroshot --model gemma4-31b-it --limit 300`, `eval-extraction`, `run-multiclass`
+  (`config/multiclass.yaml`), `report`.
+
+## Limitations (read the numbers with these)
+
+* BothBosu is synthetic; its test split and 5-fold CV are saturated (about 1.00 for every model), so the
+  evidence comes from the 5% imbalanced split and the Kaggle / NCSU cross-data-set tests.
+* Because validation PR-AUC is 1.00 for every candidate, the randomized hyper-parameter search and GraphSAGE
+  early stopping could not separate settings (`results/best_params.json`).
+* Structural graph features (degree, PageRank, betweenness, Louvain) are computed on the whole graph,
+  including test and external calls, without labels; label-based features use training labels only.
+* Kaggle calls are single-turn without speaker tags (about 46 words vs. 230 in BothBosu), which makes
+  transfer harder.
+* DistilBERT (E3) was trained for 1 epoch on CPU (the config default is 3).
+* The zero-shot LLM was run on a stratified sample of the external sets; `results/zeroshot_same_subset.csv`
+  scores every model on exactly those calls.
+* Both annotation passes (A and B) were AI-assisted; see `data/annotations/PROVENANCE.md`.
+* The four-way caller-type task uses the rule-based graph and LLM-generated prank calls
+  (`results/multiclass/`); it is a demonstration, not real-world evidence.
+* Trained models (`artifacts/`) are not committed because of their size; `train` re-creates them.
+
 ## Proposal -> implementation map
 
 | Proposal item | Command | Code |
