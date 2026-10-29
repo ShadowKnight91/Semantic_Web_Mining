@@ -20,20 +20,21 @@ def _esc(s: str) -> str:
 
 
 def to_dot(call_id: str, entities: list[dict], similar: list[dict], score: float | None) -> str:
-    title = f"{call_id}\\nscore={score:.2f}" if score is not None else call_id
+    # text parts are escaped one by one; the \\n between them is DOT's line break and must stay a single backslash
+    title = f"{_esc(call_id)}\\nscore={score:.2f}" if score is not None else _esc(call_id)
     lines = ["digraph G {", "rankdir=LR;", 'node [fontname="Helvetica", fontsize=10, style=filled];',
-             f'"call" [label="{_esc(title)}", shape=box, fillcolor="#fde0dd"];']
+             f'"call" [label="{title}", shape=box, fillcolor="#fde0dd"];']
     for k, e in enumerate(entities):
         rate = e.get("train_scam_rate")
-        lab = f"{e['object']}" + (f"\\n{rate:.0%} scam of {e['train_calls']}" if rate is not None else "\\n(unseen)")
-        lines.append(f'"e{k}" [label="{_esc(lab)}", shape=ellipse, fillcolor="{TYPE_COLORS.get(e["type"], "#ddd")}", '
+        lab = _esc(e["object"]) + (f"\\n{rate:.0%} scam of {e['train_calls']}" if rate is not None else "\\n(unseen)")
+        lines.append(f'"e{k}" [label="{lab}", shape=ellipse, fillcolor="{TYPE_COLORS.get(e["type"], "#ddd")}", '
                      f'fontcolor="white"];')
         style = ', style=dashed' if e.get("inferred") else ""
         lines.append(f'"call" -> "e{k}" [label="{e["relation"]}"{style}];')
     for k, s in enumerate(similar):
-        lab = f"{s['call_id']}\\n{'scam' if s['label'] == 1 else 'legit'} J={s['jaccard']:.2f}"
+        lab = f"{_esc(s['call_id'])}\\n{'scam' if s['label'] == 1 else 'legit'} J={s['jaccard']:.2f}"
         color = "#f4a6a6" if s["label"] == 1 else "#a6c8f4"
-        lines.append(f'"s{k}" [label="{_esc(lab)}", shape=box, fillcolor="{color}"];')
+        lines.append(f'"s{k}" [label="{lab}", shape=box, fillcolor="{color}"];')
         lines.append(f'"call" -> "s{k}" [label="SIMILAR_TO", style=dotted, arrowhead=none];')
     lines.append("}")
     return "\n".join(lines)
