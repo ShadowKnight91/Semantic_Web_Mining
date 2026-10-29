@@ -41,15 +41,14 @@ Tests: 30 -> 42 (`python -m pytest`); all pass. The offline demo (`run-all`) run
 | `config/config.yaml` | Kaggle slug `teeconnie/scam-and-non-scam-call-conversation-dataset` | the data set the proposal now cites as [18] |
 | `README.md` | documents all of the above, the new commands and both TA answers | |
 
-## Not verified here
+## Verified since (Oct 17-22, real runs)
 
-* LLM extraction with real Ollama models (tested with a fake Ollama server that returns prose,
-  cut-off JSON, off-schema triples and bare lists; every case ended in the expected status).
-* Neo4j / GDS backend (no Neo4j server available).
-* E3 (DistilBERT, SBERT) and the SBERT text block: the model weights could not be downloaded in the
-  test environment; GraphSAGE was tested with the TF-IDF + SVD text block.
-* Real BothBosu / Kaggle data (download blocked in the test environment). The NCSU loader was checked on
-  the real `metadata.csv` (1,378 English robocalls).
+* LLM extraction on ASU Voyager: Gemma 4 31B on all 3,104 calls; Qwen3 30B and the prompt variants on the
+  test split plus the 50 annotated calls.
+* Neo4j 5.20 + GDS: `build-graph --backend neo4j` loaded 3,104 calls and 12,441 relationships, GDS Louvain found
+  174 communities; SHACL validation conforms. Dump: `neo4j/dumps/neo4j.dump`.
+* E3 (DistilBERT, 1 epoch on CPU; SBERT-MLP) and GraphSAGE with the SBERT text block ran on the real data.
+* Real BothBosu, Kaggle and NCSU data.
 
 ## Merged with the `review-fixes` work (Neo4j / LLM verification, Kaggle, X1 gold)
 
