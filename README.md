@@ -62,6 +62,62 @@ flowchart LR
   (`results/multiclass/`); it is a demonstration, not real-world evidence.
 * Trained models (`artifacts/`) are not committed because of their size; `train` re-creates them.
 
+## Follow-up on the professor's feedback
+
+The presentation feedback named one opportunity and two risks: GraphSAGE on a deterministic KG could uncover scam scripts
+bag-of-words models miss; the 31B / 30B extraction models are a bottleneck, so try lighter ones; and watch recall as the
+data moves from balanced synthetic calls to noisy, imbalanced FTC robocalls. Each has a command. Everything is written to
+`results/feedback/` and `artifacts/feedback/`, so the committed results are not touched. Results and limits:
+`results/feedback/REPORT.md`, and the "Professor's feedback" tab of the dashboard.
+
+| Command | Question | Needs |
+|---|---|---|
+| `benchmark-extractors --models qwen2.5:3b` | How good and how costly are small models? | Ollama |
+| `cascade` | How many LLM calls can the keyword rules save? | existing runs |
+| `compare-runs --runs <run> ... [--deep]` | Does cheaper extraction hurt detection? | existing runs |
+| `serving-run --serve-run <run>` | Train on the heavy KG, serve new calls with a light extractor | existing runs |
+| `monitor-recall [--noise]` | Where does recall go, and can a monitor see it without labels? | saved scores |
+| `discover-scripts [--retrain]` | Which scripts do GraphSAGE and bag of words each find or miss? | torch |
+| `feedback-report` | Write `results/feedback/REPORT.md` | the above |
+
+```bash
+python -m scamkg benchmark-extractors --models gemma3:1b gemma2:2b qwen2.5:3b --gold-only
+python -m scamkg benchmark-extractors --models qwen2.5:3b --prompts v1_full --constrained on
+python -m scamkg monitor-recall --noise
+python -m scamkg discover-scripts
+python -m scamkg feedback-report
+```
+
+What was added:
+
+* **Constrained decoding** (`extract --constrained`): the ontology becomes a JSON schema that Ollama enforces while
+  generating, so each relation fixes its object type and allowed values. `v4_compact` is a short prompt and answer format
+  for small models.
+* **Cascade and serving runs**: rules first with an LLM only for low-coverage calls; or heavy extraction once for training
+  and a light extractor for calls that arrive later.
+* **Recall monitor**: recall per step away from the training data with bootstrap intervals, recall at a required precision
+  as scams get rare, recall recovered by a small labelled pilot, label-free warning signals checked against true recall in
+  a simulated drifting stream, and simulated speech-to-text noise (`scamkg/data/noise.py`).
+* **Script discovery**: two new GraphSAGE embeddings. `graphsage_kg` sees entity meaning but no transcript word.
+  Label-free GraphSAGE trains on link prediction and defines the scripts, because the supervised embedding collapses to the
+  scam score (see `script_map.png`). Leave-one-type-out and 5-seed runs test the claims.
+
+Limits of these results:
+
+* Small models ran on an M1 Pro; Gemma's and Qwen's latencies come from a shared Voyager server, which was not reachable
+  for these runs. So Gemma was neither re-timed nor re-run on noisy text.
+* There is no gold on Kaggle and FTC calls: "agreement" is with Gemma, and is not accuracy.
+* The noise is simulated, and the detection test re-extracts with the rules. The 3B model kept fewer of its own facts on
+  noisy text than the rules did, so a small LLM is not a fix for noise; Gemma could not be tested on it.
+* The 50 gold calls give wide intervals: rules, `gemma2:9b` and Qwen 30B cannot be separated on F1. The cheaper extractors
+  were only tested on calls scored later: "train with Gemma, serve with a small model", not a KG built by a small model alone.
+* FTC robocalls have no legitimate calls of their own, so their false alarms come from Kaggle. Extractor quirks can separate
+  those two data sets, which makes the Kaggle-only result the fairer test.
+* Only 400 legitimate calls stand behind the false-alarm rates, so very low rates and very rare scams cannot be measured.
+* The monitor's alert levels are starting points, not validated limits.
+* A cluster shares KG facts, not always a story a person would call one script: read `script_assignments.csv` before naming
+  one. Only a few transcripts per hidden cluster were read, and no one labelled them.
+
 ## Proposal -> implementation map
 
 | Proposal item | Command | Code |
@@ -388,6 +444,7 @@ leaves an active transaction log and the dump refuses to run (start and stop it 
 | `results/ablation.csv` | entity-type and feature-group ablations |
 | `results/explanations.jsonl` | KG evidence for flagged calls |
 | `results/REPORT.md`, `results/figures/`, `results/eda/` | report tables and figures |
+| `results/feedback/REPORT.md`, `results/feedback/*.csv`, `results/feedback/figures/` | follow-up on the professor's feedback |
 | `artifacts/models/` | trained models (`joblib`, DistilBERT, GraphSAGE) |
 
 ## Leakage safeguards and reproducibility
@@ -418,10 +475,11 @@ config/          config.yaml (real data), demo.yaml (synthetic demo overrides)
 ontology/        ontology.yaml, OWL (Turtle), SHACL shapes, SPARQL examples
 scamkg/          the package (python -m scamkg --help)
   data/          download, loaders, preprocessing, EDA, synthetic demo generator
-  extraction/    prompts, Ollama/OpenAI-compatible clients, LLM + rule extractors, X1 evaluation
+  extraction/    prompts, Ollama/OpenAI-compatible clients, LLM + rule extractors, X1 evaluation, benchmark + cascade
   graph/         KG construction, graph features, Neo4j/GDS store, RDF export, plots
-  models/        classical (E1/E2/E2G), transformers (E3), GraphSAGE (E4), clustering (E5), LLM zero-shot, BankSim
-  evaluation/    metrics, evaluator, McNemar, ablations, explanations, report
+  models/        classical (E1/E2/E2G), transformers (E3), GraphSAGE (E4), clustering (E5), script discovery,
+                 LLM zero-shot, BankSim
+  evaluation/    metrics, evaluator, McNemar, ablations, explanations, report, recall monitor, noise test
   predict.py     score a new transcript end-to-end
 dashboard/       Streamlit results dashboard
 neo4j/           Cypher examples (data/dumps created by docker compose)

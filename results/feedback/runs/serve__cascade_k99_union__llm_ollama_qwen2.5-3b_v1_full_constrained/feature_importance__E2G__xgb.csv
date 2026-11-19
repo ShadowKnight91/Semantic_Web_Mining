@@ -1,0 +1,41 @@
+feature,weight
+graph:knn_scam_rate,0.52178967
+graph:sim_diff,0.2237731
+graph:community_scam_rate,0.20284237
+graph:sim_scam_topk,0.051594917
+graph:het_degree,0.0
+entity:Organization::Police Headquarters,0.0
+entity:Organization::the,0.0
+entity:Organization::Delivery Service,0.0
+entity:Organization::Reaching OUT,0.0
+entity:Organization::US Customs and Border Protection,0.0
+entity:Organization::Credit Card Company,0.0
+entity:Organization::From,0.0
+entity:Organization::Electric Company,0.0
+entity:PaymentChannel::other,0.0
+entity:Organization::Internet Service Provider,0.0
+entity:Organization::Bank Account,0.0
+entity:Organization::Hospital,0.0
+entity:Organization::Health Department,0.0
+entity:Organization::Group,0.0
+entity:Organization::District Police,0.0
+entity:Organization::Credit Card,0.0
+entity:CallbackNumber::ivr:press-9,0.0
+entity:CallbackNumber::ivr:press-1,0.0
+entity:Organization::Bank Accounts,0.0
+entity:Organization::Mobile APP,0.0
+entity:Organization::Commissions,0.0
+entity:Organization::Fund Transfers,0.0
+entity:Organization::Affiliate Marketing Venture,0.0
+entity:Organization::Affiliate Marketing,0.0
+entity:Organization::Retailer Customer Service,0.0
+entity:Organization::Bank Name,0.0
+entity:Organization::Full Name,0.0
+entity:Organization::Website,0.0
+entity:Organization::PayPal,0.0
+entity:Organization::Court,0.0
+entity:Organization::Electric Utility,0.0
+entity:Organization::Vehicle Service Department,0.0
+entity:PaymentChannel::crypto,0.0
+entity:Organization::Credit Card Security Team,0.0
+entity:Organization::IS,0.0

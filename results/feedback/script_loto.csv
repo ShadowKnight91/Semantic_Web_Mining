@@ -1,0 +1,41 @@
+held_out_type,held_out_class,model,own_cluster_f1,flag_rate,pr_auc,recall_at_10pct_false_alarms
+delivery,legitimate,GraphSAGE,0.40249609984399376,0.0,1.0,
+delivery,legitimate,"GraphSAGE, structure only",0.6143187066974596,0.0,0.9999999999999999,
+delivery,legitimate,"GraphSAGE, KG facts",0.7474747474747475,0.0,1.0,
+delivery,legitimate,"GraphSAGE, label-free",0.7860082304526749,,,
+delivery,legitimate,Bag of words,1.0,0.43,1.0,
+insurance,legitimate,GraphSAGE,0.41430332922318125,0.0,1.0,
+insurance,legitimate,"GraphSAGE, structure only",0.6194029850746269,0.0,0.9999999999999998,
+insurance,legitimate,"GraphSAGE, KG facts",0.3944636678200692,0.01,1.0,
+insurance,legitimate,"GraphSAGE, label-free",0.6578947368421053,,,
+insurance,legitimate,Bag of words,0.9070294784580499,0.0,1.0,
+refund,scam,GraphSAGE,0.5871559633027523,0.955,0.9998780487804879,1.0
+refund,scam,"GraphSAGE, structure only",0.6706586826347305,1.0,1.0,1.0
+refund,scam,"GraphSAGE, KG facts",0.5376344086021505,0.99,1.0,1.0
+refund,scam,"GraphSAGE, label-free",0.5697674418604651,,,
+refund,scam,Bag of words,0.9795918367346939,1.0,1.0,1.0
+reward,scam,GraphSAGE,0.6280487804878049,0.8793969849246231,0.9995075386240894,0.9949748743718593
+reward,scam,"GraphSAGE, structure only",0.47752808988764045,1.0,1.0,1.0
+reward,scam,"GraphSAGE, KG facts",0.5739910313901345,0.949748743718593,0.9994965213315237,1.0
+reward,scam,"GraphSAGE, label-free",0.4631578947368421,,,
+reward,scam,Bag of words,0.99,0.949748743718593,1.0000000000000002,1.0
+ssn,scam,GraphSAGE,0.8497409326424871,1.0,1.0,1.0
+ssn,scam,"GraphSAGE, structure only",0.5037974683544304,1.0,1.0,1.0
+ssn,scam,"GraphSAGE, KG facts",0.4744429882044561,1.0,0.9999999999999999,1.0
+ssn,scam,"GraphSAGE, label-free",0.549079754601227,,,
+ssn,scam,Bag of words,0.9925558312655087,1.0,1.0,1.0
+support,scam,GraphSAGE,0.6055045871559633,0.875,0.9996323470515205,1.0
+support,scam,"GraphSAGE, structure only",0.3868421052631579,0.98,0.999950495049505,1.0
+support,scam,"GraphSAGE, KG facts",0.45031446540880504,1.0,1.0,1.0
+support,scam,"GraphSAGE, label-free",0.6475849731663685,,,
+support,scam,Bag of words,0.9803921568627451,0.99,1.0,1.0
+telemarketing,legitimate,GraphSAGE,0.35223160434258144,0.015,0.999931129476584,
+telemarketing,legitimate,"GraphSAGE, structure only",0.322180916976456,0.025,0.9999999999999999,
+telemarketing,legitimate,"GraphSAGE, KG facts",0.35918367346938773,0.215,0.999931129476584,
+telemarketing,legitimate,"GraphSAGE, label-free",0.46950092421441775,,,
+telemarketing,legitimate,Bag of words,0.7882037533512064,0.005,1.0,
+wrong,legitimate,GraphSAGE,0.6421404682274248,0.05527638190954774,1.0,
+wrong,legitimate,"GraphSAGE, structure only",0.6421404682274248,0.035175879396984924,0.987268623808555,
+wrong,legitimate,"GraphSAGE, KG facts",0.6421404682274248,0.035175879396984924,1.0,
+wrong,legitimate,"GraphSAGE, label-free",0.6095238095238096,,,
+wrong,legitimate,Bag of words,1.0,0.1608040201005025,0.9999999999999998,

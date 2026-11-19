@@ -120,6 +120,28 @@ class Ontology:
         t = self.entity_types.get(type_name)
         return list(t.values) if t else []
 
+    # ------------------------------------------------------------------ constrained decoding
+    def json_schema(self, max_triples: int = 15, max_text: int = 200, compact: bool = False) -> dict:
+        """JSON schema of the extraction answer, for decoders that enforce a grammar (Ollama `format`).
+
+        Each triple is one branch per relation, so the relation fixes its object type and, for closed types,
+        the allowed values: a model cannot produce an off-ontology triple at all, whatever its size. The
+        length caps stop small models from looping until the token limit. `compact` leaves out `object_type`
+        (the relation implies it) and `detail` (nothing scores it): fewer tokens to generate for every triple."""
+        text = {"type": "string", "maxLength": 100 if compact else max_text}
+        branches = []
+        for r in self.relations.values():
+            obj = {"type": "string", "enum": self.allowed_values(r.target)} if self.is_closed(r.target) else text
+            if compact:
+                props = {"relation": {"const": r.name}, "object": obj, "evidence": text,
+                         "inferred": {"type": "boolean"}}
+            else:
+                props = {"relation": {"const": r.name}, "object_type": {"const": r.target}, "object": obj,
+                         "detail": text, "evidence": text, "inferred": {"type": "boolean"}}
+            branches.append({"type": "object", "properties": props, "required": list(props)})
+        return {"type": "object", "required": ["triples"],
+                "properties": {"triples": {"type": "array", "maxItems": max_triples, "items": {"anyOf": branches}}}}
+
     # ------------------------------------------------------------------ prompts
     def prompt_block(self, descriptors: bool = True) -> str:
         """Human-readable ontology description injected into the extraction prompt."""

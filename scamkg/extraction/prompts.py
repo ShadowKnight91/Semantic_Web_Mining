@@ -12,6 +12,7 @@ PROMPT_VERSIONS: dict[str, dict] = {
     "v2_no_descriptors": {"ontology": True, "descriptors": False, "example": True},
     "v3_no_example": {"ontology": True, "descriptors": True, "example": False},
     "v0_open": {"ontology": False, "descriptors": False, "example": False},
+    "v4_compact": {"ontology": True, "descriptors": False, "example": False, "compact": True},   # for small models
 }
 
 EXAMPLE_TRANSCRIPT = (
@@ -75,6 +76,17 @@ _RULES = """RULES
 5. Legitimate calls also have identities, organizations and requests - extract them the same way. Do not judge whether the call is a scam.
 6. Do not invent facts. Use one triple per distinct fact; a relation may appear several times (e.g. several tactics).{example}"""
 
+# Small models: a short prompt and an answer without object_type / detail, so less to read and less to generate.
+_COMPACT_RULES = """RULES
+1. Extract facts about what the CALLER says or does, not the receiver. Do not judge whether the call is a scam.
+2. Output one JSON object {"triples": [...]} and nothing else. Each triple is {"relation": <relation>, "object": <value>, "evidence": <short quote from the transcript>, "inferred": <true if implied, false if stated>}.
+3. For types with allowed values, "object" is exactly one allowed value; use "other" only if nothing fits.
+4. One triple per distinct fact; a relation may repeat. Do not invent facts. If there are none, return {"triples": []}.
+
+EXAMPLE
+Transcript: This is Officer Brown from the Social Security Administration. To avoid arrest today, pay a fine with gift cards.
+Output: {"triples": [{"relation": "CLAIMS_TO_BE", "object": "government_agent", "evidence": "This is Officer Brown", "inferred": false}, {"relation": "MENTIONS_ORG", "object": "Social Security Administration", "evidence": "from the Social Security Administration", "inferred": false}, {"relation": "USES_TACTIC", "object": "threat", "evidence": "To avoid arrest today", "inferred": false}, {"relation": "PAY_VIA", "object": "gift_card", "evidence": "pay a fine with gift cards", "inferred": false}]}"""
+
 _OPEN_SYSTEM = """You are an information-extraction engine. Read the phone-call transcript and extract knowledge-graph triples about the CALLER.
 Return a single JSON object {"triples": [{"relation": <predicate you choose, UPPER_SNAKE_CASE>, "object": <value>, "evidence": <short quote>, "inferred": <true|false>}]} and nothing else."""
 
@@ -83,6 +95,9 @@ def _system_prompt(ontology: Ontology, version: str) -> str:
     spec = PROMPT_VERSIONS[version]
     if not spec["ontology"]:
         return _OPEN_SYSTEM
+    if spec.get("compact"):
+        return ("You extract knowledge-graph facts from phone calls.\n\nONTOLOGY\n" +
+                ontology.prompt_block(descriptors=False) + "\n\n" + _COMPACT_RULES)
     example = ""
     if spec["example"]:
         example = ("\n\nEXAMPLE (format only - extract from the new transcript, never copy the example)\n"

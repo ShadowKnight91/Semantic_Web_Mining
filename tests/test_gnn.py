@@ -71,3 +71,60 @@ def test_fusion_graphsage_runs_and_writes_variants(demo_ctx, use_pyg):
     import json
     info = json.loads((ctx.paths.results / "graphsage_fusion.json").read_text())
     assert info["variants"][0]["input_dims"]["topo"] == len(info["topology_features"])
+
+
+def _loto_child(cfg: dict, run: str) -> None:
+    from scamkg.context import Context
+    gnn.run_graphsage_loto(Context.load(cfg, run=run), variants=("kg",))
+
+
+def test_graphsage_loto_keeps_the_held_out_type_out_of_training(demo_ctx):
+    ctx = _ctx(demo_ctx)
+    fold = copy.copy(ctx)
+    fold.calls = ctx.calls.copy()
+    prim = ctx.calls[ctx.calls["dataset"] == ctx.primary]
+    t = sorted(prim["subtype"].unique())[0]
+    held = (fold.calls["dataset"] == ctx.primary) & (fold.calls["subtype"] == t)
+    fold.calls.loc[held & fold.calls["split"].isin(["train", "val"]), "split"] = "held_out"
+    assert not set(fold.calls.loc[held].index) & set(fold.train_ids + fold.val_ids)
+    import multiprocessing
+    p = multiprocessing.get_context("spawn").Process(target=_loto_child, args=(ctx.cfg, ctx.run_name))
+    p.start()
+    p.join()
+    assert p.exitcode == 0
+    z = np.load(gnn.loto_path(ctx), allow_pickle=False)
+    assert f"{t}|kg|prob" in z.files and z[f"{t}|unsup|emb"].shape[0] == ctx.kg.n_calls
+
+
+def test_every_variant_saves_its_embeddings(demo_ctx):
+    ctx = _ctx(demo_ctx)
+    assert gnn.embeddings_path(ctx, "text+topo") != gnn.embeddings_path(ctx, "topo") != gnn.embeddings_path(ctx)
+
+
+def _score_child(cfg: dict, run: str, out: str) -> None:
+    import torch
+
+    from scamkg.context import Context
+    from scamkg.utils import has_module
+    ctx = Context.load(cfg, run=run)
+    use_pyg = has_module("torch_geometric")
+    device = torch.device("cpu")
+    graphs, _, _, n_c, _ = gnn.prepare_graphs(ctx, use_pyg, device)
+    text = gnn.text_block(ctx, "tfidf_svd")
+    blocks = {"text": text, "kg": gnn.kg_block(text, n_c), "topo": gnn.topology_block(ctx)[0], "type": gnn.type_block(ctx)}
+    res = gnn._train_variant(ctx, "kg", blocks, graphs, n_c, use_pyg, device)
+    same = gnn.score_variant(ctx, "kg", res, blocks, graphs["full"], n_c, use_pyg, device)
+    np.savez(out, trained=res["prob"], scored=same, kg_call_rows=blocks["kg"][:n_c])
+
+
+def test_trained_weights_score_a_graph_without_retraining_and_kg_block_has_no_transcript(demo_ctx, tmp_path):
+    ctx = _ctx(demo_ctx)
+    import multiprocessing
+    out = str(tmp_path / "scores.npz")
+    p = multiprocessing.get_context("spawn").Process(target=_score_child, args=(ctx.cfg, ctx.run_name, out))
+    p.start()
+    p.join()
+    assert p.exitcode == 0
+    z = np.load(out)
+    assert np.allclose(z["trained"], z["scored"], atol=1e-5)
+    assert np.all(z["kg_call_rows"] == 0)

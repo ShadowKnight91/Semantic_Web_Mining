@@ -1,0 +1,41 @@
+feature,weight
+graph:knn_scam_rate,0.43954954
+graph:sim_diff,0.35598528
+graph:sim_scam_topk,0.15564518
+graph:community_scam_rate,0.04677116
+tfidf:refund,0.0020488696
+tfidf:reference,0.0
+tfidf:refer me,0.0
+tfidf:refer,0.0
+tfidf:reducing,0.0
+tfidf:reduces heat,0.0
+tfidf:reduces,0.0
+tfidf:reduce waste,0.0
+tfidf:reduce their,0.0
+tfidf:reduce heat,0.0
+tfidf:reduce costs,0.0
+tfidf:reduce,0.0
+tfidf:redeemable at,0.0
+tfidf:redeemable,0.0
+tfidf:reference from,0.0
+tfidf:reference it,0.0
+tfidf:000,0.0
+tfidf:reference or,0.0
+tfidf:refund all,0.0
+tfidf:refund ah,0.0
+tfidf:refund again,0.0
+tfidf:refund account,0.0
+tfidf:refreshing to,0.0
+tfidf:refreshing,0.0
+tfidf:reference number,0.0
+tfidf:references right,0.0
+tfidf:references if,0.0
+tfidf:references from,0.0
+tfidf:references and,0.0
+tfidf:references,0.0
+tfidf:referenced,0.0
+tfidf:redeem your,0.0
+tfidf:references or,0.0
+tfidf:redeem,0.0
+tfidf:red next,0.0
+tfidf:red flags,0.0

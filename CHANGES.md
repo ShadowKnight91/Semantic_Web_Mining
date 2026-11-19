@@ -93,3 +93,25 @@ and text + KG models are perfect, so the split cannot separate them. The style c
 22% (LR) / 53% (RF) of the same-generator fraud / sales calls `prankster`, the KG models 0% (E2 / LR gets all 36
 right; KG-only E2G 97%). The KG alone is weak at telling pranks from other legitimate calls (prankster F1 about
 0.5), because pranks state few ontology facts. Limits: synthetic pranks, 18 test pranks, 36 control calls.
+
+## Professor's feedback on the presentation
+
+Nothing here changes the committed results: new outputs go to `results/feedback/` and `artifacts/feedback/`, the cache keys
+and prompt hash of existing runs are unchanged (both have tests), and `models.graphsage.variants` keeps its default.
+
+| File | Change | Reason |
+|---|---|---|
+| `scamkg/ontology/schema.py`, `extraction/llm_client.py`, `extractor.py` | `json_schema()` and `extract --constrained`: Ollama enforces the ontology while generating | a small model cannot emit an off-ontology relation; the ontology check moves from after generation to during it |
+| `scamkg/extraction/prompts.py` | prompt `v4_compact`, compact schema without `object_type` and `detail` | the relation already implies the type and nothing scores `detail`; fewer tokens per triple |
+| `scamkg/extraction/benchmark.py` (new) | `benchmark-extractors`, `cascade`, `serving-run`, `compare-runs` | quality, latency and memory of small models; detection on a KG from each extractor, with one set of hyper-parameters |
+| `scamkg/data/noise.py` (new) | seeded speech-to-text noise at 5%, 15%, 30% word errors | "noisy" FTC calls could not be tested otherwise |
+| `scamkg/evaluation/monitor.py`, `noise_run.py` (new) | `monitor-recall [--noise]` | recall at each step, with intervals; recall at a required precision; pilot recalibration; label-free signals checked against true recall |
+| same | the stream's reference has the stream's scam rate, and a signal must hold for 2 windows | against the balanced test split every window looked like drift, even with none |
+| same | noise test: models train once on clean calls, then score noisy calls | retraining per level made the "frozen" threshold belong to a different model (GraphSAGE false alarms jumped to 63% and back) |
+| `scamkg/models/gnn.py` | variant `kg` (entity meaning, no transcript words) | the `topo` variant cannot tell `government_agent` from `tech_support`: their nodes differ only in degree |
+| same | label-free GraphSAGE (link prediction), `run_graphsage_loto`, 5-seed scores, `score_variant` | the supervised embedding collapses to the scam score, so per-script recall on its clusters would be circular; scores move between seeds; weights must run on a new graph without retraining |
+| `scamkg/models/script_discovery.py` (new) | `discover-scripts` | tests the claim that GraphSAGE finds what bag of words misses, and reports where it does not |
+| `scamkg/evaluation/feedback_report.py` (new), `dashboard/app.py` | `feedback-report`, a dashboard tab | every number in the report comes from the CSV files |
+| `scamkg/extraction/extractor.py` | cascade and serving runs are "derived": they can be named, but `list_runs` skips them | otherwise the newest large run would silently become the default for `eda`, and `eval-extraction` would score recombinations as extractors |
+
+Tests: 62 -> 101.

@@ -1,0 +1,41 @@
+feature,weight
+graph:knn_scam_rate,0.4566227
+graph:sim_diff,0.3101488
+graph:community_scam_rate,0.22434092
+graph:sim_scam_topk,0.008295323
+graph:entity_mean_popularity,0.0005922911
+entity:Organization::Fitness Centre,0.0
+entity:Organization::Internet Services,0.0
+entity:Organization::Courier Services,0.0
+entity:ClaimedIdentity::employer_recruiter,0.0
+entity:Organization::Airlines,0.0
+entity:Organization::Medical Clinic,0.0
+entity:ClaimedIdentity::healthcare_provider,0.0
+entity:ClaimedIdentity::utility_company,0.0
+entity:Organization::Wells Fargo,0.0
+entity:Organization::Johns Pizza,0.0
+entity:Organization::Foundation,0.0
+entity:ClaimedIdentity::law_enforcement,0.0
+graph:het_degree,0.0
+entity:Organization::Johns Auto Repair,0.0
+entity:Organization::Careers,0.0
+entity:Organization::Travel Agency,0.0
+entity:Organization::University Advisors,0.0
+entity:Organization::GAS Services,0.0
+entity:Organization::Energy Services,0.0
+entity:Organization::Resorts,0.0
+entity:Organization::PET Clinic,0.0
+entity:Organization::Realty,0.0
+entity:Organization::General Insurance,0.0
+entity:Organization::Community Center,0.0
+entity:Organization::Investments,0.0
+entity:ClaimedIdentity::relative_or_friend,0.0
+entity:Organization::Datapro,0.0
+entity:ClaimedIdentity::charity,0.0
+entity:Organization::ABC Delivery,0.0
+entity:Organization::Techcorp,0.0
+entity:Organization::ABC,0.0
+entity:ClaimedIdentity::insurance,0.0
+entity:Organization::Safeguard Insurance,0.0
+entity:Organization::National Association of Insurance Commissioners,0.0
+entity:Organization::XYZ Insurance,0.0

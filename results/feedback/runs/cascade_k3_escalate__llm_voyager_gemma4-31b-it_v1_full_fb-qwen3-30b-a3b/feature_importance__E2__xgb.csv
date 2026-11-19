@@ -1,0 +1,41 @@
+feature,weight
+graph:community_scam_rate,0.48194134
+graph:knn_scam_rate,0.24728316
+graph:sim_diff,0.122234285
+graph:entity_risk_mean,0.06780777
+tfidf:offering special,0.013089133
+graph:sim_scam_topk,0.008957742
+graph:sim_scam_max,0.007845022
+tfidf:down,0.0066605527
+tfidf:wow that,0.006145291
+tfidf:to confirm,0.0038853046
+tfidf:process,0.003403895
+graph:entity_risk_max,0.003304619
+tfidf:amazing,0.003207865
+tfidf:ago,0.00312036
+tfidf:verify some,0.0026223555
+tfidf:delivery,0.002319666
+tfidf:said,0.0022243569
+tfidf:re offering,0.0020946953
+tfidf:offering,0.0015847908
+tfidf:xyz,0.0015028393
+tfidf:card,0.0014359393
+tfidf:david and,0.0013222141
+tfidf:you need,0.0011570707
+tfidf:need to,0.00097470015
+tfidf:but how,0.00062313955
+graph:entity_mean_popularity,0.0006118247
+tfidf:anyway,0.00054161175
+tfidf:200,0.00044894946
+tfidf:discount,0.0004339768
+tfidf:we re,0.00034034104
+tfidf:amount,0.0003147889
+tfidf:give,0.00025934423
+tfidf:yes,0.00013985456
+tfidf:the phone,0.00012818558
+tfidf:need,2.46724e-05
+graph:sim_legit_topk,8.370092e-06
+tfidf:recent survey,0.0
+tfidf:recent issue,0.0
+tfidf:recent purchase,0.0
+tfidf:recent data,0.0

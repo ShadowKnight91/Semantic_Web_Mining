@@ -1,0 +1,41 @@
+feature,weight
+graph:knn_scam_rate,0.41260663
+graph:sim_diff,0.33851388
+graph:community_scam_rate,0.0366666
+graph:sim_scam_topk,0.029951833
+tfidf:card to,0.015615515
+tfidf:deal on,0.014266768
+tfidf:name and,0.010824324
+tfidf:ha,0.0106775155
+tfidf:special deal,0.010159444
+tfidf:offering special,0.009011602
+tfidf:trust,0.008616659
+tfidf:from xyz,0.0084246835
+tfidf:okay but,0.008066169
+tfidf:identity,0.007401576
+tfidf:our new,0.005660447
+tfidf:not sure,0.0049031214
+graph:entity_risk_max,0.0046846676
+tfidf:isn scam,0.004524763
+tfidf:company we,0.0044115954
+tfidf:re offering,0.004244398
+tfidf:supervisor,0.0040945904
+tfidf:30,0.0039043366
+tfidf:process,0.0038960823
+tfidf:why,0.0035449872
+tfidf:offering,0.0034513478
+graph:n_known_entities,0.0032077555
+tfidf:need to,0.003126124
+graph:het_degree,0.002541473
+tfidf:special,0.002419247
+tfidf:refund,0.0019732523
+tfidf:will be,0.0019655041
+tfidf:don worry,0.0019445132
+tfidf:uh,0.0017580024
+tfidf:did you,0.0015965598
+tfidf:what makes,0.0013924824
+tfidf:need,0.0010902472
+tfidf:some information,0.001058377
+tfidf:re,0.00094685244
+tfidf:bank,0.0008851379
+tfidf:account,0.00087718223

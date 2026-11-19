@@ -1,0 +1,41 @@
+feature,weight
+graph:sim_diff,0.75733095
+graph:knn_scam_rate,0.18658458
+graph:sim_scam_topk,0.021323489
+graph:n_PAY_VIA,0.0042827073
+graph:sim_scam_max,0.002950361
+graph:entity_risk_max,0.0027759993
+graph:cc_degree,0.002764217
+graph:entity_mean_popularity,0.0025048363
+graph:het_degree,0.002450097
+graph:sim_legit_topk,0.0023579842
+entity:ClaimedIdentity::bank,0.0021489665
+graph:n_known_entities,0.0020708377
+entity:RequestedAsset::card_number,0.0018628809
+graph:het_pagerank,0.0017541789
+graph:community_size,0.0012571809
+graph:cc_weighted_degree,0.001127193
+graph:community_scam_rate,0.0010166474
+graph:het_betweenness,0.00079165894
+entity:RequestedAsset::personal_info,0.0007102488
+graph:cc_pagerank,0.000533785
+graph:entity_max_popularity,0.000522665
+entity:PressureTactic::urgency,0.00036980098
+graph:entity_risk_mean,0.00030804615
+graph:entity_risk_min,0.00020067165
+entity:ClaimedIdentity::utility_company,0.0
+entity:ClaimedIdentity::relative_or_friend,0.0
+entity:Organization::Wells Fargo,0.0
+entity:Organization::Internal Revenue Service,0.0
+entity:ClaimedIdentity::healthcare_provider,0.0
+entity:ClaimedIdentity::law_enforcement,0.0
+entity:CallbackNumber::555-555-5555,0.0
+entity:PaymentChannel::p2p_app,0.0
+entity:Organization::UPS,0.0
+entity:Organization::Target,0.0
+entity:Organization::American Express,0.0
+entity:ClaimedIdentity::delivery_service,0.0
+entity:ClaimedIdentity::prize_or_lottery,0.0
+entity:ClaimedIdentity::telemarketer_sales,0.0
+entity:ClaimedIdentity::employer_recruiter,0.0
+entity:Organization::PayPal,0.0

@@ -1,0 +1,41 @@
+feature,weight
+graph:knn_scam_rate,0.6211547
+graph:community_scam_rate,0.1916161
+graph:sim_diff,0.1526432
+graph:sim_scam_max,0.029881021
+graph:sim_scam_topk,0.004272566
+tfidf:john,0.0004323239
+tfidf:records see,0.0
+tfidf:records okay,0.0
+tfidf:records of,0.0
+tfidf:records it,0.0
+tfidf:records how,0.0
+tfidf:records can,0.0
+tfidf:records but,0.0
+tfidf:records and,0.0
+tfidf:records,0.0
+tfidf:recording,0.0
+tfidf:records now,0.0
+tfidf:recorded,0.0
+tfidf:000,0.0
+tfidf:records that,0.0
+tfidf:redeemable at,0.0
+tfidf:redeemable,0.0
+tfidf:redeem your,0.0
+tfidf:redeem,0.0
+tfidf:red next,0.0
+tfidf:red flags,0.0
+tfidf:red are,0.0
+tfidf:red,0.0
+tfidf:rectify the,0.0
+tfidf:rectify,0.0
+tfidf:records your,0.0
+tfidf:records you,0.0
+tfidf:records what,0.0
+tfidf:records we,0.0
+tfidf:records the,0.0
+tfidf:records show,0.0
+tfidf:record of,0.0
+tfidf:record for,0.0
+tfidf:record,0.0
+tfidf:recent purchases,0.0
