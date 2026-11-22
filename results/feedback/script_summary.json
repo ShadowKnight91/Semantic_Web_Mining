@@ -1,0 +1,7 @@
+{
+  "k": 16,
+  "run": "llm_voyager_gemma4-31b-it_v1_full_fb-qwen3-30b-a3b",
+  "n_scams": 1905,
+  "hidden_scripts": 8,
+  "calls_in_hidden_scripts": 848
+}

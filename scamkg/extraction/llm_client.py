@@ -65,16 +65,23 @@ class BaseLLMClient:
 class OllamaClient(BaseLLMClient):
     provider = "ollama"
 
-    def __init__(self, model: str, base_url: str = "http://localhost:11434", num_ctx: int = 8192, **kw):
+    def __init__(self, model: str, base_url: str = "http://localhost:11434", num_ctx: int = 8192,
+                 format_schema: dict | None = None, **kw):
         super().__init__(model, **kw)
         self.base_url = base_url.rstrip("/")
         self.num_ctx = num_ctx
+        self.format_schema = format_schema   # constrained decoding: the grammar enforces the ontology
+
+    def describe(self) -> dict:
+        return {**super().describe(), "constrained": self.format_schema is not None}
 
     def chat(self, messages: list[dict]) -> str:
         payload = {"model": self.model, "messages": messages, "stream": False,
                    "options": {"temperature": self.temperature, "seed": self.seed, "num_ctx": self.num_ctx,
                                "num_predict": self.max_tokens}}
-        if self.json_mode:
+        if self.format_schema is not None:
+            payload["format"] = self.format_schema
+        elif self.json_mode:
             payload["format"] = "json"
         r = _post_with_retry(f"{self.base_url}/api/chat", payload, timeout=self.timeout)
         if r.status_code == 404:
@@ -130,8 +137,12 @@ class CachedLLMClient:
     def _key(self, messages: list[dict]) -> str:
         c = self.client
         # max_tokens is part of the key: raising it must not replay responses that were cut off
-        return sha256_text(json.dumps({"p": c.provider, "m": c.model, "t": c.temperature, "s": c.seed,
-                                       "j": c.json_mode, "n": c.max_tokens, "msg": messages}, sort_keys=True))
+        key = {"p": c.provider, "m": c.model, "t": c.temperature, "s": c.seed, "j": c.json_mode, "n": c.max_tokens,
+               "msg": messages}
+        schema = getattr(c, "format_schema", None)
+        if schema is not None:   # added only when set, so existing cached responses keep their keys
+            key["fs"] = schema
+        return sha256_text(json.dumps(key, sort_keys=True))
 
     def chat(self, messages: list[dict]) -> str:
         key = self._key(messages)
@@ -151,7 +162,7 @@ class CachedLLMClient:
 
 
 def make_client(cfg: dict, cache_dir: Path | None = None, model: str | None = None,
-                provider: str | None = None) -> CachedLLMClient | BaseLLMClient:
+                provider: str | None = None, format_schema: dict | None = None) -> CachedLLMClient | BaseLLMClient:
     llm = cfg["llm"]
     provider = provider or llm["provider"]
     model = model or llm["model"]
@@ -162,8 +173,11 @@ def make_client(cfg: dict, cache_dir: Path | None = None, model: str | None = No
     if provider == "ollama":
         base = os.environ.get(pcfg.get("base_url_env") or "OLLAMA_BASE_URL") or pcfg.get("base_url") \
             or "http://localhost:11434"
-        client: BaseLLMClient = OllamaClient(model, base_url=base, num_ctx=int(pcfg.get("num_ctx", 8192)), **common)
+        client: BaseLLMClient = OllamaClient(model, base_url=base, num_ctx=int(pcfg.get("num_ctx", 8192)),
+                                             format_schema=format_schema, **common)
     else:
+        if format_schema is not None:
+            raise LLMError("Constrained decoding (--constrained) needs the ollama provider")
         base = os.environ.get(pcfg.get("base_url_env") or "", "") or pcfg.get("base_url")
         if not base:
             raise LLMError(f"No base URL for provider {provider!r}: set {pcfg.get('base_url_env', 'VOYAGER_BASE_URL')} "

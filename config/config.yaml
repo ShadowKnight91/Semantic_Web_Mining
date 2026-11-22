@@ -138,9 +138,24 @@ models:
     use_similarity_edges: false
     inductive: true                # loss graph holds training calls only; test / external calls join at scoring
     variants: [text+topo, text, topo]   # text+topo is reported as `graphsage`; the others are the block ablation
+    unsup_epochs: 200              # label-free GraphSAGE for script discovery (discover-scripts)
     fusion: {text_dim: 64, topo_dim: 16, type_dim: 8}   # per-block projection sizes before LayerNorm
   clustering:
     k_min: 2
     k_max: 12
     pca_dim: 20
     dbscan_min_samples: 5
+
+monitor:                           # `monitor-recall`; the levels below are starting points, not validated limits
+  threshold: 0.5                   # the threshold being monitored, as deployed
+  recall_floor: 0.80               # below this: WARN, or ALERT when the whole 95% interval is below it
+  max_drop: 0.10                   # recall drop from the synthetic test split that counts as degradation
+  psi_warn: 0.10                   # score shift (population stability index, a common rule of thumb)
+  psi_alert: 0.25
+  oov_warn: 0.05                   # rise in the share of words the training data never used
+  oov_alert: 0.10
+  target_fpr: 0.10                 # false-alarm rate a small labelled pilot recalibrates to
+  prevalences: [0.5, 0.1, 0.05, 0.01]
+  precision_targets: [0.5, 0.8]
+  pilot_sizes: [20, 50, 100, 200]
+  noise_levels: [clean, light, medium, heavy]   # scamkg/data/noise.py: 0%, 5%, 15%, 30% word errors

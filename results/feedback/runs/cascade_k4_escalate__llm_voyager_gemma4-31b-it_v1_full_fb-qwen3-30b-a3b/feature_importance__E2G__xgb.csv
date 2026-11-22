@@ -1,0 +1,41 @@
+feature,weight
+graph:sim_scam_max,0.73120177
+graph:sim_diff,0.14359014
+graph:knn_scam_rate,0.10210642
+graph:entity_risk_max,0.013879154
+graph:community_size,0.0072736805
+graph:community_scam_rate,0.0012789986
+graph:entity_risk_min,0.00066988653
+entity:Organization::Visa,0.0
+entity:ClaimedIdentity::healthcare_provider,0.0
+entity:Organization::Medical Clinic,0.0
+entity:Organization::Airlines,0.0
+entity:ClaimedIdentity::employer_recruiter,0.0
+entity:Organization::Courier Services,0.0
+entity:Organization::Internet Services,0.0
+entity:Organization::Fitness Centre,0.0
+entity:Organization::Foundation,0.0
+graph:het_degree,0.0
+entity:ClaimedIdentity::law_enforcement,0.0
+entity:Organization::Investments,0.0
+entity:Organization::Careers,0.0
+entity:Organization::Travel Agency,0.0
+entity:Organization::University Advisors,0.0
+entity:Organization::GAS Services,0.0
+entity:Organization::Energy Services,0.0
+entity:Organization::Resorts,0.0
+entity:Organization::PET Clinic,0.0
+entity:Organization::Realty,0.0
+entity:Organization::Wells Fargo,0.0
+entity:Organization::Johns Pizza,0.0
+entity:Organization::Internal Revenue Service,0.0
+entity:ClaimedIdentity::relative_or_friend,0.0
+entity:Organization::XYZ Insurance,0.0
+entity:Organization::XYZ Insurance Company,0.0
+entity:Organization::ABC Insurance,0.0
+entity:Organization::DMV,0.0
+entity:Organization::ABC Insurance Company,0.0
+entity:Organization::Trustpilot,0.0
+entity:Organization::Department of Insurance,0.0
+entity:Organization::Datamax,0.0
+entity:PaymentChannel::cash,0.0

@@ -337,6 +337,8 @@ class LLMExtractor(BaseExtractor):
         self.max_retries = max_retries
         self.max_chars = max_chars
         self.name = f"llm_{client.provider}_{client.model}_{prompt_version}"
+        if getattr(client, "format_schema", None) is not None:
+            self.name += "_constrained"
         if fallback_client is not None:   # own run name, so it never mixes with a single-model comparison run
             self.name += f"_fb-{fallback_client.model}"
 
@@ -438,22 +440,24 @@ class LLMExtractor(BaseExtractor):
 
 def make_extractor(kind: str, cfg: dict, ontology: Ontology, cache_dir: Path | None = None,
                    model: str | None = None, provider: str | None = None,
-                   prompt_version: str | None = None) -> BaseExtractor:
+                   prompt_version: str | None = None, constrained: bool = False) -> BaseExtractor:
     standardizer = EntityStandardizer(ontology)
     if kind == "rule":
         from scamkg.extraction.rule_based import RuleBasedExtractor
         return RuleBasedExtractor(ontology, standardizer)
     if kind == "llm":
         from scamkg.extraction.llm_client import make_client
-        client = make_client(cfg, cache_dir=cache_dir, model=model, provider=provider)
         llm = cfg["llm"]
+        version = prompt_version or llm.get("prompt_version", "v1_full")
+        compact = PROMPT_VERSIONS.get(version, {}).get("compact", False)
+        client = make_client(cfg, cache_dir=cache_dir, model=model, provider=provider,
+                             format_schema=ontology.json_schema(compact=compact) if constrained else None)
         fallback = None
         fb_model = llm.get("fallback_model")
         if fb_model and fb_model != client.model:
             fallback = make_client(cfg, cache_dir=cache_dir, model=fb_model,
                                    provider=llm.get("fallback_provider") or provider)
-        return LLMExtractor(client, ontology, standardizer, prompt_version or llm.get("prompt_version", "v1_full"),
-                            int(llm.get("max_retries", 2)), int(llm.get("max_chars", 6000)),
+        return LLMExtractor(client, ontology, standardizer, version, int(llm.get("max_retries", 2)), int(llm.get("max_chars", 6000)),
                             grounding=bool(llm.get("grounding", True)), fallback_client=fallback,
                             schema_retry=bool(llm.get("schema_retry", True)))
     raise ValueError(f"Unknown extractor {kind!r} (use 'rule' or 'llm')")
@@ -566,8 +570,15 @@ def run_extraction(calls: pd.DataFrame, extractor: BaseExtractor, out_dir: Path,
     return out_path
 
 
+def is_derived_run(path: Path) -> bool:
+    """Cascade and serving runs only recombine other runs' triples (scamkg/extraction/benchmark.py)."""
+    return Path(path).stem.startswith(("cascade_", "serve__"))
+
+
 def list_runs(extractions_dir: Path) -> list[Path]:
-    runs = [p for p in Path(extractions_dir).glob("*.jsonl")]
+    """Extraction runs, oldest first. Derived runs can still be named (--run), but are never picked as "the latest
+    run" and are not scored as extractors, so creating one cannot change what another command uses."""
+    runs = [p for p in Path(extractions_dir).glob("*.jsonl") if not is_derived_run(p)]
     return sorted(runs, key=lambda p: p.stat().st_mtime)
 
 

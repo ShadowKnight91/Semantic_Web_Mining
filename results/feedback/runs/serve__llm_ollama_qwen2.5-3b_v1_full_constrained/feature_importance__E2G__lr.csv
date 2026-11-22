@@ -1,0 +1,41 @@
+feature,weight
+graph:knn_scam_rate,1.2484743529454305
+graph:community_scam_rate,1.0852437462206006
+graph:sim_scam_max,0.8039435225932614
+graph:sim_diff,0.7782078412498156
+graph:sim_scam_topk,0.7413110887327903
+graph:sim_legit_topk,-0.6219883103061514
+graph:sim_legit_max,-0.6074525478398617
+graph:entity_risk_mean,0.48647303329287794
+graph:n_REQUESTS,0.4716853817651971
+graph:entity_risk_min,0.4592509932183185
+graph:n_USES_TACTIC,0.4401066786447222
+graph:het_pagerank,0.40723629390418653
+graph:het_degree,0.39084676784534333
+graph:n_known_entities,0.36491051259431884
+graph:entity_risk_max,0.32591807284143304
+entity:ClaimedIdentity::prize_or_lottery,0.3007836965048445
+graph:n_inferred,-0.2931497455896493
+entity:Organization::XYZ Bank,-0.2851524342802535
+entity:ClaimedIdentity::insurance,-0.2793385176367829
+graph:entity_mean_popularity,0.2383973706523258
+entity:ClaimedIdentity::telemarketer_sales,-0.2093382144479902
+entity:RequestedAsset::personal_info,-0.20820271018648426
+graph:n_CLAIMS_TO_BE,0.20715445225472343
+graph:cc_pagerank,0.20624128576009854
+graph:cc_degree,0.20556959718847093
+graph:cc_weighted_degree,0.20219746480867745
+entity:PressureTactic::reward,0.20109820557152155
+entity:ClaimedIdentity::bank,-0.2004740423949255
+graph:entity_max_popularity,0.19581415293729282
+entity:Organization::Better Business Bureau,-0.1814756877316327
+graph:has_entities,0.17417381355877942
+entity:ClaimedIdentity::retailer_customer_service,0.15398065172260084
+graph:n_PROVIDES_NUMBER,0.14094585101536472
+graph:n_MENTIONS_ORG,-0.14061824635866138
+graph:n_PAY_VIA,-0.13670711337348182
+entity:RequestedAsset::card_number,0.13338066759911557
+entity:RequestedAsset::bank_account,0.13234359165064288
+entity:PressureTactic::urgency,-0.13142096121025879
+entity:Organization::XYZ Company,-0.12004256476467455
+entity:ClaimedIdentity::tech_support,0.10382471764203514

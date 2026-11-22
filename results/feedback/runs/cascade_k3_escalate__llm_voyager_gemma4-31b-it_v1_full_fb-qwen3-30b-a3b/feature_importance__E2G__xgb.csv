@@ -1,0 +1,41 @@
+feature,weight
+graph:knn_scam_rate,0.6274299
+graph:sim_diff,0.28181303
+graph:entity_risk_mean,0.04144432
+graph:sim_scam_topk,0.010466484
+graph:sim_scam_max,0.009478941
+graph:entity_risk_max,0.008682234
+graph:het_pagerank,0.0046845335
+graph:entity_mean_popularity,0.003985736
+graph:n_PAY_VIA,0.003983828
+graph:n_known_entities,0.0020574355
+graph:sim_legit_topk,0.0018645643
+graph:het_degree,0.0013127071
+entity:RequestedAsset::card_number,0.0011115907
+graph:entity_risk_min,0.0009745388
+graph:community_scam_rate,0.0006089057
+graph:sim_legit_max,7.904499e-05
+graph:cc_pagerank,2.2241564e-05
+entity:Organization::Wells Fargo,0.0
+entity:Organization::Visa,0.0
+entity:ClaimedIdentity::healthcare_provider,0.0
+entity:Organization::Medical Clinic,0.0
+entity:Organization::Airlines,0.0
+entity:ClaimedIdentity::employer_recruiter,0.0
+entity:Organization::Courier Services,0.0
+entity:Organization::Internet Services,0.0
+entity:Organization::Fitness Centre,0.0
+entity:Organization::Foundation,0.0
+entity:ClaimedIdentity::law_enforcement,0.0
+entity:Organization::University Advisors,0.0
+entity:Organization::Johns Pizza,0.0
+entity:Organization::Travel Agency,0.0
+entity:Organization::Careers,0.0
+entity:Organization::Investments,0.0
+entity:Organization::GAS Services,0.0
+entity:Organization::Johns Auto Repair,0.0
+entity:Organization::XYZ Services,0.0
+entity:Organization::Green Energy Solutions,0.0
+entity:Organization::XYZ Insurance Company,0.0
+entity:Organization::ABC Insurance,0.0
+entity:Organization::DMV,0.0

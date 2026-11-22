@@ -1,0 +1,41 @@
+feature,weight
+graph:knn_scam_rate,0.4053308
+graph:community_scam_rate,0.36121756
+graph:sim_diff,0.15945554
+graph:sim_scam_max,0.07399606
+entity:Organization::Energy Services,0.0
+entity:Organization::GAS Services,0.0
+entity:Organization::University Advisors,0.0
+entity:Organization::Travel Agency,0.0
+entity:Organization::Resorts,0.0
+graph:het_degree,0.0
+entity:Organization::Investments,0.0
+entity:ClaimedIdentity::healthcare_provider,0.0
+entity:ClaimedIdentity::law_enforcement,0.0
+entity:Organization::Police Department,0.0
+entity:Organization::Logistics,0.0
+entity:Organization::Delivery,0.0
+entity:Organization::Courier Service,0.0
+entity:Organization::Careers,0.0
+entity:Organization::PET Clinic,0.0
+entity:Organization::Life Insurance,0.0
+entity:Organization::Foundation,0.0
+entity:Organization::Auto Insurance,0.0
+entity:Organization::General Insurance,0.0
+entity:Organization::DR S Office,0.0
+entity:Organization::Other,0.0
+entity:Organization::Community Center,0.0
+entity:Organization::and,0.0
+entity:Organization::IS,0.0
+entity:Organization::Group,0.0
+entity:ClaimedIdentity::utility_company,0.0
+entity:Organization::Internet Service Provider,0.0
+entity:PaymentChannel::other,0.0
+entity:Organization::Bank Account,0.0
+entity:Organization::Realty,0.0
+entity:Organization::Electronics,0.0
+entity:Organization::Fitness Centre,0.0
+entity:Organization::From,0.0
+entity:CallbackNumber::555-555-5555,0.0
+entity:Organization::Yelp,0.0
+entity:Organization::Green Earth Cleaning Solutions,0.0

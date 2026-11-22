@@ -1,0 +1,41 @@
+feature,weight
+graph:knn_scam_rate,0.35727865
+graph:sim_diff,0.32460648
+graph:community_scam_rate,0.2846585
+graph:sim_scam_max,0.019542951
+graph:sim_scam_topk,0.0139134275
+entity:Organization::UPS,0.0
+entity:Organization::Onlinestore COM,0.0
+entity:Organization::Techworld,0.0
+entity:Organization::ABC Delivery,0.0
+entity:Organization::Techcorp,0.0
+entity:Organization::ABC,0.0
+entity:ClaimedIdentity::insurance,0.0
+entity:Organization::Safeguard Insurance,0.0
+graph:het_degree,0.0
+entity:Organization::National Association of Insurance Commissioners,0.0
+entity:Organization::XYZ Insurance,0.0
+entity:Organization::XYZ Insurance Company,0.0
+entity:Organization::ABC Insurance,0.0
+entity:Organization::DMV,0.0
+entity:Organization::ABC Insurance Company,0.0
+entity:Organization::Trustpilot,0.0
+entity:Organization::Department of Insurance,0.0
+entity:Organization::Datamax,0.0
+entity:Organization::Speedy Delivery,0.0
+entity:Organization::XYZ Delivery,0.0
+entity:Organization::XYZ Delivery Company,0.0
+entity:ClaimedIdentity::other,0.0
+entity:Organization::American Consumer Rewards,0.0
+entity:Organization::Reward Masters,0.0
+entity:Organization::American Rewards,0.0
+entity:Organization::Giftcard PRO,0.0
+entity:Organization::American Express,0.0
+entity:Organization::Target,0.0
+entity:Organization::Gift Card Rewards,0.0
+entity:Organization::Giftcard Rewards,0.0
+entity:Organization::Customer Rewards Center,0.0
+entity:Organization::Better Business Bureau,0.0
+entity:Organization::Giftcard,0.0
+entity:ClaimedIdentity::delivery_service,0.0
+entity:Organization::XYZ Delivery Services,0.0

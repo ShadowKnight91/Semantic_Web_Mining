@@ -3,6 +3,9 @@
 Pipeline order (or just `run-all`):
   download | demo-data -> preprocess -> extract -> build-graph -> eda -> annotate-sample -> eval-extraction
   -> train (E1 E2 E2G E3 E4 E5 LLM) -> cv -> loto -> significance -> ablate -> explain -> report -> dashboard
+
+Professor's feedback (results in results/feedback/, the committed results are not touched):
+  benchmark-extractors -> cascade -> compare-runs | monitor-recall [--noise] | discover-scripts -> feedback-report
 """
 from __future__ import annotations
 
@@ -83,7 +86,8 @@ def cmd_extract(args, cfg):
     for model in (models if args.extractor == "llm" else [None]):
         for version in (versions if args.extractor == "llm" else [None]):
             ex = make_extractor(args.extractor, cfg, ctx.ontology, cache_dir=ctx.paths.cache, model=model,
-                                provider=args.provider, prompt_version=version)
+                                provider=args.provider, prompt_version=version,
+                                constrained=getattr(args, "constrained", False))
             run_name = args.run_name if (args.run_name and len(models) * len(versions) == 1) else None
             # rule extraction takes seconds -> always recompute; LLM runs resume (responses are also cached)
             resume = not args.no_resume and args.extractor == "llm"
@@ -116,6 +120,47 @@ def cmd_eval_extraction(args, cfg):
                                   paths.results, gold_path=args.gold)
     if not df.empty:
         print(df.to_string(index=False))
+
+
+def cmd_benchmark_extractors(args, cfg):
+    from scamkg.context import Context
+    from scamkg.extraction.benchmark import benchmark_table, run_benchmark
+    ctx = Context.load(cfg, with_graph=False)
+    if args.models:
+        modes = {"both": (True, False), "on": (True,), "off": (False,)}[args.constrained]
+        run_benchmark(ctx, args.models, args.prompts, modes, n_each=args.n_each, gold_only=args.gold_only,
+                      workers=args.workers)
+    if args.noise_model:
+        from scamkg.extraction.benchmark import extraction_noise_table
+        table = extraction_noise_table(ctx, args.noise_model, args.prompts[0], args.constrained != "off", args.n_each)
+        print(table.round(3).to_string(index=False))
+    df = benchmark_table(ctx)
+    show = ["model", "prompt", "constrained", "parameters", "loaded_gb", "n_calls", "gold_f1", "gold_precision",
+            "gold_recall", "agree_ncsu_f1", "agree_kaggle_f1", "schema_conformant", "failed", "latency_mean_s",
+            "latency_p95_s", "hours_per_100k_calls"]
+    print(df[[c for c in show if c in df]].round(3).to_string(index=False))
+
+
+def cmd_cascade(args, cfg):
+    from scamkg.context import Context
+    from scamkg.extraction.benchmark import cascade_table
+    ctx = Context.load(cfg, with_graph=False)
+    llm_run = args.llm_run or cfg.get("extraction", {}).get("default_run")
+    print(cascade_table(ctx, args.rule_run, llm_run, args.k, args.mode).round(3).to_string(index=False))
+
+
+def cmd_compare_runs(args, cfg):
+    from scamkg.context import Context
+    from scamkg.extraction.benchmark import compare_runs, downstream_summary
+    ctx = Context.load(cfg, with_graph=False)
+    df = compare_runs(ctx, args.runs, args.experiments, args.models, deep=args.deep)
+    print(downstream_summary(df).round(3).to_string(index=False))
+
+
+def cmd_serving_run(args, cfg):
+    from scamkg.context import Context
+    from scamkg.extraction.benchmark import build_serving_run
+    print(build_serving_run(Context.load(cfg, with_graph=False), args.train_run, args.serve_run, args.name).stem)
 
 
 # ---------------------------------------------------------------------------- graph
@@ -180,7 +225,7 @@ def _deep_ok(*mods: str) -> bool:
 def _deep_worker(experiment: str, cfg: dict, run: str | None) -> None:
     from scamkg.context import Context
     set_seed(int(cfg["project"]["seed"]))
-    ctx = Context.load(cfg, with_graph=experiment == "E4", run=run)
+    ctx = Context.load(cfg, with_graph=experiment.startswith("E4"), run=run)
     ctx.run_name = ctx.run_name or run  # recorded in metrics.csv
     if experiment == "E3":
         from scamkg.models.transformer import run_distilbert, run_sbert_mlp
@@ -191,6 +236,14 @@ def _deep_worker(experiment: str, cfg: dict, run: str | None) -> None:
     elif experiment == "E4" and _deep_ok("torch"):
         from scamkg.models.gnn import run_graphsage
         run_graphsage(ctx)
+    elif experiment == "E4_SCRIPTS" and _deep_ok("torch"):
+        from scamkg.models.gnn import run_graphsage_loto, run_graphsage_scripts, run_graphsage_seed_scores
+        run_graphsage_scripts(ctx)
+        run_graphsage_seed_scores(ctx)
+        run_graphsage_loto(ctx)
+    elif experiment == "E4_SEEDS" and _deep_ok("torch"):
+        from scamkg.models.gnn import run_graphsage_seed_scores
+        run_graphsage_seed_scores(ctx)   # every variant: discover-scripts reads the same file
 
 
 def run_deep_isolated(experiment: str, cfg: dict, run: str | None) -> None:
@@ -249,6 +302,40 @@ def cmd_significance(args, cfg):
     df = run_significance(Context.load(cfg, with_graph=False))
     if not df.empty:
         print(df.to_string(index=False))
+
+
+def cmd_monitor_recall(args, cfg):
+    from scamkg.context import Context
+    from scamkg.evaluation.monitor import run_monitor
+    ctx = Context.load(cfg, run=args.run)
+    out = run_monitor(ctx)
+    keep = ["model", "stage", "n_scams", "recall", "recall_ci_low", "recall_ci_high", "recall_drop", "false_alarm_rate",
+            "recall_at_target_fpr", "status"]
+    print(out["ladder"][keep].round(3).to_string(index=False))
+    print(out["stream"].round(3).to_string(index=False))
+    if args.noise:
+        from scamkg.evaluation.noise_run import run_noise_robustness
+        print(run_noise_robustness(cfg, ctx, args.noise_run).round(3).to_string(index=False))
+
+
+def cmd_discover_scripts(args, cfg):
+    from scamkg.context import Context
+    from scamkg.extraction.benchmark import run_config
+    from scamkg.config import deep_merge
+    from scamkg.models.gnn import embeddings_path, loto_path
+    from scamkg.models.script_discovery import run_script_discovery
+    main = Context.load(cfg, with_graph=False)
+    run = args.run or cfg.get("extraction", {}).get("default_run")
+    rcfg = deep_merge(run_config(cfg, run), {"models": {"graphsage": {"variants": ["text+topo", "text", "topo", "kg"]}}})
+    rctx = Context.load(rcfg, run=run)
+    if args.retrain or not embeddings_path(rctx, "kg").exists():
+        run_deep_isolated("E4", rcfg, rctx.run_name)
+    if args.retrain or not embeddings_path(rctx, "unsup").exists() or not loto_path(rctx).exists():
+        run_deep_isolated("E4_SCRIPTS", rcfg, rctx.run_name)
+    out = run_script_discovery(main, rctx, k=args.k)
+    for name in ("methods", "rescue", "rescue_seeds", "scripts", "loto"):
+        if name in out:
+            print(f"\n== {name} ==\n{out[name].round(3).to_string(index=False)}")
 
 
 def cmd_cluster(args, cfg):
@@ -323,6 +410,12 @@ def cmd_report(args, cfg):
     except FileNotFoundError:
         pass
     print(build_report(ctx))
+
+
+def cmd_feedback_report(args, cfg):
+    from scamkg.context import Context
+    from scamkg.evaluation.feedback_report import build_feedback_report
+    print(build_feedback_report(Context.load(cfg, with_graph=False)))
 
 
 def cmd_predict(args, cfg):
@@ -420,7 +513,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--provider", default=None, help="ollama | voyager (default: config llm.provider)")
     s.add_argument("--model", nargs="+", default=None, help="one or more LLM names, e.g. qwen2.5:7b gemma2:9b")
     s.add_argument("--prompt-version", nargs="+", default=None,
-                   help="v1_full | v2_no_descriptors | v3_no_example | v0_open (several = prompt ablation)")
+                   help="v1_full | v2_no_descriptors | v3_no_example | v0_open | v4_compact (several = prompt ablation)")
     s.add_argument("--datasets", nargs="+", default=None)
     s.add_argument("--splits", nargs="+", default=None)
     s.add_argument("--limit", type=int, default=None, help="a seeded random sample of N pending calls (pilot run)")
@@ -431,7 +524,35 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--no-resume", action="store_true")
     s.add_argument("--no-fallback", action="store_true",
                    help="disable llm.fallback_model (use for the model / prompt comparisons of RQ2)")
+    s.add_argument("--constrained", action="store_true",
+                   help="constrained decoding: Ollama enforces the ontology as a JSON schema while generating")
     s.set_defaults(fn=cmd_extract)
+    s = sub.add_parser("benchmark-extractors", help="lighter models: quality, agreement, latency, memory")
+    s.add_argument("--models", nargs="+", default=None, help="Ollama models to run; omit to only rebuild the table")
+    s.add_argument("--prompts", nargs="+", default=["v1_full", "v4_compact"])
+    s.add_argument("--constrained", choices=["both", "on", "off"], default="both")
+    s.add_argument("--n-each", type=int, default=50, help="calls per external data set, besides the gold calls")
+    s.add_argument("--gold-only", action="store_true", help="only the gold calls (a quick screen)")
+    s.add_argument("--workers", type=int, default=1, help="keep 1 when latency matters")
+    s.add_argument("--noise-model", default=None, help="also compare this model with the rules on noisy transcripts")
+    s.set_defaults(fn=cmd_benchmark_extractors)
+    s = sub.add_parser("cascade", help="rule extractor first; only low-coverage calls go to an LLM")
+    s.add_argument("--rule-run", default="rule")
+    s.add_argument("--llm-run", default=None, help="default: extraction.default_run")
+    s.add_argument("--k", nargs="+", type=int, default=[1, 2, 3, 4, 5, 6], help="escalate below this many rule triples")
+    s.add_argument("--mode", choices=["escalate", "union"], default="escalate")
+    s.set_defaults(fn=cmd_cascade)
+    s = sub.add_parser("compare-runs", help="does cheaper extraction hurt detection? one KG per extraction run")
+    s.add_argument("--runs", nargs="+", required=True)
+    s.add_argument("--experiments", nargs="+", choices=["E1", "E2", "E2G"], default=["E2", "E2G"])
+    s.add_argument("--models", nargs="+", choices=["lr", "svm", "rf", "xgb"], default=["lr", "xgb"])
+    s.add_argument("--deep", action="store_true", help="also train GraphSAGE on each KG (5 seeds)")
+    s.set_defaults(fn=cmd_compare_runs)
+    s = sub.add_parser("serving-run", help="train once with a heavy extractor, serve new calls with a light one")
+    s.add_argument("--train-run", default=None, help="triples of training calls (default: extraction.default_run)")
+    s.add_argument("--serve-run", required=True, help="triples of the calls scored afterwards")
+    s.add_argument("--name", default=None)
+    s.set_defaults(fn=cmd_serving_run)
 
     s = sub.add_parser("annotate-sample", help="sample calls + templates for the 2-annotator gold standard")
     s.add_argument("--n", type=int, default=50)
@@ -470,6 +591,16 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--run", default=None)
     s.set_defaults(fn=cmd_loto)
     sub.add_parser("significance", help="McNemar tests E1 vs E2/E2G").set_defaults(fn=cmd_significance)
+    s = sub.add_parser("monitor-recall", help="recall from synthetic to FTC calls: ladder, prevalence, drift, stream")
+    s.add_argument("--run", default=None, help="KG run for the coverage signals (default: extraction.default_run)")
+    s.add_argument("--noise", action="store_true", help="also score transcripts with simulated speech-to-text errors")
+    s.add_argument("--noise-run", default="rule", help="KG of the noise test; its triples must re-run on noisy text")
+    s.set_defaults(fn=cmd_monitor_recall)
+    s = sub.add_parser("discover-scripts", help="GraphSAGE: scam scripts across data sets that bag of words misses")
+    s.add_argument("--run", default=None, help="KG run (default: extraction.default_run)")
+    s.add_argument("--k", type=int, default=16, help="number of script clusters; the same for every method")
+    s.add_argument("--retrain", action="store_true", help="retrain GraphSAGE even if embeddings exist")
+    s.set_defaults(fn=cmd_discover_scripts)
     s = sub.add_parser("cluster", help="E5: K-Means / DBSCAN scam-script discovery")
     s.add_argument("--run", default=None)
     s.set_defaults(fn=cmd_cluster)
@@ -502,6 +633,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--run", default=None, help="existing extraction run for the KG (default: rule-based)")
     s.set_defaults(fn=cmd_run_multiclass)
     sub.add_parser("report", help="write results/REPORT.md").set_defaults(fn=cmd_report)
+    sub.add_parser("feedback-report", help="write results/feedback/REPORT.md").set_defaults(fn=cmd_feedback_report)
     s = sub.add_parser("predict", help="score a new transcript with a trained model + KG explanation")
     s.add_argument("--text", default=None)
     s.add_argument("--file", default=None)

@@ -69,6 +69,8 @@ def image(name: str, caption: str | None = None) -> None:
     p = res / "figures" / name
     if not p.exists():
         p = res / "eda" / "figures" / name
+    if not p.exists():
+        p = res / "feedback" / "figures" / name
     if p.exists():
         st.image(str(p), caption=caption, width="stretch")
 
@@ -97,7 +99,7 @@ if "demo" in (cfg_path or ""):
     st.warning("Synthetic demo data: template-generated calls used to exercise the pipeline, not evidence for the RQs.")
 
 tabs = st.tabs(["Overview", "Models (RQ1)", "Cross-dataset (RQ3)", "Extraction (RQ2)", "Clustering (RQ4)",
-                "Ablations", "Call explorer", "Try a transcript", "Caller types"])
+                "Ablations", "Call explorer", "Try a transcript", "Caller types", "Professor's feedback"])
 
 with tabs[0]:
     summ_path = paths.processed / "summary.json"
@@ -295,3 +297,47 @@ with tabs[8]:
         if cm:
             st.subheader(f"Confusion matrix ({info['main']}, rows = true type)")
             st.dataframe(pd.DataFrame(cm, index=info["classes"], columns=info["classes"]), width="stretch")
+
+with tabs[9]:
+    if not (res / "feedback").exists():
+        st.info("No results yet. Run `python -m scamkg monitor-recall`, `discover-scripts` and `benchmark-extractors`.")
+    else:
+        def table(name: str, columns: list[str] | None = None) -> None:
+            df = csv(f"feedback/{name}")
+            if df is not None:
+                show = [c for c in (columns or df.columns) if c in df.columns]
+                st.dataframe(df[show].round(3), hide_index=True, width="stretch")
+
+        st.write("Three follow-ups: lighter extraction models, recall from synthetic to noisy FTC calls, and scam scripts "
+                 "bag of words misses. Details and limits: `results/feedback/REPORT.md`.")
+        light, recall, scripts = st.tabs(["Lighter extraction", "Recall monitor", "Hidden scripts"])
+        with light:
+            image("extractor_benchmark.png", "F1 on the 50 gold calls against seconds per call")
+            table("extractor_benchmark.csv", ["model", "prompt", "constrained", "provider", "parameters", "loaded_gb",
+                                              "gold_f1", "agree_ncsu_f1", "agree_kaggle_f1", "failed", "latency_mean_s",
+                                              "latency_p95_s", "hours_per_100k_calls"])
+            st.subheader("Detection on a KG from each extractor")
+            table("downstream_summary.csv")
+            st.subheader("Rules first, LLM only when they find too little")
+            for p in sorted((res / "feedback").glob("cascade__*.csv")):
+                table(p.name)
+        with recall:
+            image("recall_ladder.png", "Recall at each step away from the training data")
+            image("recall_prevalence.png", "Recall when alerts must stay trustworthy as scams get rare")
+            a, b = st.columns(2)
+            with a:
+                image("recall_recalibration.png", "What a small labelled pilot recovers")
+            with b:
+                image("recall_noise.png", "Simulated speech-to-text noise")
+            image("recall_stream.png", "A stream drifting from synthetic to real calls")
+            st.subheader("Label-free warning signals")
+            table("drift_signals.csv")
+        with scripts:
+            image("script_map.png", "Scam calls in three spaces (first two principal components)")
+            image("script_recall.png", "Recall per script, at the same false-alarm rate")
+            table("scripts.csv", ["script", "calls", "training_share", "hidden", "signature", "top_words", "bow_recall",
+                                  "graphsage_recall", "missed_by_bow_caught_by_graphsage"])
+            st.subheader("Clustering spaces compared")
+            table("script_methods.csv")
+            st.subheader("Recall over seeds")
+            table("script_seeds.csv")

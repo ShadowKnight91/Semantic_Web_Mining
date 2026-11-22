@@ -1,0 +1,30 @@
+{
+  "gemma3:1b": {
+    "model": "gemma3:1b",
+    "disk_gb": 0.81,
+    "parameters": "999.89M",
+    "quantization": "Q4_K_M",
+    "loaded_gb": 0.95
+  },
+  "gemma2:2b": {
+    "model": "gemma2:2b",
+    "disk_gb": 1.63,
+    "parameters": "2.6B",
+    "quantization": "Q4_0",
+    "loaded_gb": 2.06
+  },
+  "qwen2.5:3b": {
+    "model": "qwen2.5:3b",
+    "disk_gb": 1.93,
+    "parameters": "3.1B",
+    "quantization": "Q4_K_M",
+    "loaded_gb": 2.39
+  },
+  "gemma2:9b": {
+    "model": "gemma2:9b",
+    "disk_gb": 5.44,
+    "parameters": "9.2B",
+    "quantization": "Q4_0",
+    "loaded_gb": 6.38
+  }
+}

@@ -1,0 +1,41 @@
+feature,weight
+graph:knn_scam_rate,1.1954029442698315
+graph:community_scam_rate,0.9933902992268794
+graph:sim_scam_max,0.7512671194020749
+graph:sim_diff,0.7504595618294061
+graph:sim_scam_topk,0.7010202879227767
+graph:sim_legit_topk,-0.6180532754806315
+graph:sim_legit_max,-0.6112014376641094
+graph:entity_risk_min,0.5303000401192448
+graph:entity_risk_mean,0.49782460372213216
+graph:n_REQUESTS,0.4491829104103667
+graph:n_USES_TACTIC,0.42133684208972155
+graph:entity_max_popularity,0.41949601185950086
+graph:het_degree,0.35435068872533704
+graph:n_inferred,-0.3454268245436636
+graph:het_pagerank,0.3295194282886429
+graph:entity_mean_popularity,0.32742352565127447
+graph:community_size,0.3226853093873328
+graph:n_known_entities,0.322260612567174
+entity:ClaimedIdentity::telemarketer_sales,-0.28843920976034343
+entity:Organization::XYZ Bank,-0.28224984809637654
+entity:ClaimedIdentity::prize_or_lottery,0.28164260310110023
+graph:entity_risk_max,0.27459107013483236
+graph:cc_pagerank,0.2457669175760963
+entity:ClaimedIdentity::insurance,-0.2358510571815257
+entity:ClaimedIdentity::bank,-0.22705984698904463
+graph:cc_weighted_degree,0.20883263116336218
+graph:cc_degree,0.18767424411132244
+entity:RequestedAsset::personal_info,-0.18684188235292365
+entity:Organization::Better Business Bureau,-0.1808141074018314
+entity:Organization::XYZ Company,-0.1692850648671373
+graph:n_MENTIONS_ORG,-0.1492296843065561
+entity:ClaimedIdentity::retailer_customer_service,0.13380160748867148
+graph:n_PROVIDES_NUMBER,0.1264445365600453
+entity:ClaimedIdentity::tech_support,0.11248506023497402
+entity:RequestedAsset::bank_account,0.11079521463778938
+graph:has_entities,0.09979627430408489
+entity:RequestedAsset::ssn,0.09859924025533452
+entity:RequestedAsset::card_number,0.08992267613685102
+entity:Organization::Walmart,0.08069642288008398
+graph:n_PAY_VIA,-0.07849630355124823

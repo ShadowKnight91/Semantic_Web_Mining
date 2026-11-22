@@ -65,7 +65,8 @@ log = get_logger(__name__)
 
 # heavy-tailed, non-negative columns that get log1p before standardisation
 _LOG_COLS = {"het_degree", "het_pagerank", "cc_degree", "cc_weighted_degree", "cc_pagerank", "community_size"}
-VARIANT_NAMES = {"text+topo": "graphsage", "text": "graphsage_text", "topo": "graphsage_topo"}
+VARIANT_NAMES = {"text+topo": "graphsage", "text": "graphsage_text", "topo": "graphsage_topo", "kg": "graphsage_kg"}
+VARIANT_BLOCKS = {"text+topo": ["text", "topo", "type"], "kg": ["kg", "topo", "type"]}
 
 
 def build_homogeneous(ctx, use_similarity_edges: bool = False) -> tuple[np.ndarray, int, int]:
@@ -146,6 +147,15 @@ def type_block(ctx) -> np.ndarray:
     for j, t in enumerate(kg.entity_types):
         onehot[kg.n_calls + j, types.index(t)] = 1
     return onehot
+
+
+def kg_block(text: np.ndarray, n_calls: int) -> np.ndarray:
+    """Entity descriptions only; call rows are zero, so no transcript word reaches the model. Unlike the topology
+    block, it lets the model tell `government_agent` from `tech_support`: their degrees may match, their meaning
+    does not. The ontology fixes these descriptions, so they mean the same for calls the model has never seen."""
+    out = text.copy()
+    out[:n_calls] = 0
+    return out
 
 
 def node_features(ctx, method: str) -> np.ndarray:
@@ -229,15 +239,38 @@ def _restrict(edge_index: np.ndarray, n: int, n_c: int, allowed_calls: np.ndarra
     return edge_index[:, mask]
 
 
+def _block_out_dims(gcfg: dict) -> dict[str, int]:
+    fcfg = {"text_dim": 64, "topo_dim": 16, "type_dim": 8, **(gcfg.get("fusion") or {})}
+    return {"text": int(fcfg["text_dim"]), "kg": int(fcfg["text_dim"]), "topo": int(fcfg["topo_dim"]),
+            "type": int(fcfg["type_dim"])}
+
+
+def score_variant(ctx, variant: str, trained: dict, blocks_np: dict[str, np.ndarray], graph, n_c: int, use_pyg: bool,
+                  device) -> np.ndarray:
+    """Run trained weights on another graph. GraphSAGE is inductive: the weights only need the same feature sizes,
+    so a model trained once can score calls and entities it never saw, without retraining."""
+    import torch
+    gcfg = ctx.cfg["models"]["graphsage"]
+    use = VARIANT_BLOCKS.get(variant, [variant, "type"])
+    dims = {b: blocks_np[b].shape[1] for b in use}
+    out_dims = _block_out_dims(gcfg)
+    model = _model_class(use_pyg)(dims, {b: out_dims[b] for b in use}, int(gcfg["hidden"]),
+                                  float(gcfg["dropout"])).to(device)
+    model.load_state_dict(trained["state"])
+    model.eval()
+    with torch.no_grad():
+        logits, _ = model({b: torch.tensor(blocks_np[b], device=device) for b in use}, graph)
+    return torch.sigmoid(logits[:n_c]).cpu().numpy()
+
+
 def _train_variant(ctx, variant: str, blocks_np: dict[str, np.ndarray], graphs: dict, n_c: int, use_pyg: bool,
                    device) -> dict:
     import torch
     gcfg = ctx.cfg["models"]["graphsage"]
-    fcfg = {"text_dim": 64, "topo_dim": 16, "type_dim": 8, **(gcfg.get("fusion") or {})}
-    use = ["text", "topo", "type"] if variant == "text+topo" else [variant, "type"]
+    use = VARIANT_BLOCKS.get(variant, [variant, "type"])
     feats = {b: torch.tensor(blocks_np[b], device=device) for b in use}
     dims = {b: blocks_np[b].shape[1] for b in use}
-    out_dims = {"text": int(fcfg["text_dim"]), "topo": int(fcfg["topo_dim"]), "type": int(fcfg["type_dim"])}
+    out_dims = _block_out_dims(gcfg)
     set_seed(ctx.seed)
     model = _model_class(use_pyg)(dims, {b: out_dims[b] for b in use}, int(gcfg["hidden"]),
                                   float(gcfg["dropout"])).to(device)
@@ -286,14 +319,52 @@ def _train_variant(ctx, variant: str, blocks_np: dict[str, np.ndarray], graphs: 
             "best_ap": best_ap, "epochs": epoch + 1, "state": best_state, "dims": dims}
 
 
-def run_graphsage(ctx) -> None:
-    require("torch")
+def _train_unsupervised(ctx, blocks_np: dict[str, np.ndarray], graphs: dict, e_train: np.ndarray, n_c: int,
+                        use_pyg: bool, device) -> np.ndarray:
+    """Label-free GraphSAGE on KG facts: learn embeddings that predict which entities a call links to (the original
+    GraphSAGE objective, with one random negative entity per edge). No label is read and no transcript word enters,
+    so the clusters define scripts independently of every classifier they are later used to compare."""
     import torch
-
-    ctx.require_graph()
+    import torch.nn.functional as F
     gcfg = ctx.cfg["models"]["graphsage"]
-    use_pyg = has_module("torch_geometric")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    use = VARIANT_BLOCKS["kg"]
+    feats = {b: torch.tensor(blocks_np[b], device=device) for b in use}
+    dims = {b: blocks_np[b].shape[1] for b in use}
+    out_dims = _block_out_dims(gcfg)
+    set_seed(ctx.seed)
+    hidden = int(gcfg["hidden"])
+    model = _model_class(use_pyg)(dims, {b: out_dims[b] for b in use}, hidden, float(gcfg["dropout"])).to(device)
+    project = torch.nn.Linear(hidden, hidden).to(device)
+    opt = torch.optim.Adam([*model.parameters(), *project.parameters()], lr=float(gcfg["lr"]),
+                           weight_decay=float(gcfg["weight_decay"]))
+    is_call_edge = e_train[0] < n_c
+    src = torch.tensor(e_train[0][is_call_edge], device=device)
+    dst = torch.tensor(e_train[1][is_call_edge], device=device)
+    n_total = next(iter(blocks_np.values())).shape[0]
+    gen = torch.Generator(device="cpu").manual_seed(ctx.seed)
+    for epoch in range(int(gcfg.get("unsup_epochs", 200))):
+        model.train()
+        project.train()
+        opt.zero_grad()
+        _, emb = model(feats, graphs["train"])
+        z = project(emb)
+        neg = torch.randint(n_c, n_total, (len(src),), generator=gen).to(device)
+        pos_score, neg_score = (z[src] * z[dst]).sum(dim=1), (z[src] * z[neg]).sum(dim=1)
+        loss = -F.logsigmoid(pos_score).mean() - F.logsigmoid(-neg_score).mean()
+        loss.backward()
+        opt.step()
+        if epoch % 50 == 0:
+            log.info("Unsupervised GraphSAGE epoch %3d link loss %.4f", epoch, loss.item())
+    model.eval()
+    project.eval()
+    with torch.no_grad():
+        _, emb = model(feats, graphs["full"])
+        return project(emb)[:n_c].cpu().numpy()
+
+
+def prepare_graphs(ctx, use_pyg: bool, device) -> tuple[dict, np.ndarray, np.ndarray, int, int]:
+    """The three views of the graph: `train` and `val` hold no calls the model may not see yet (inductive)."""
+    gcfg = ctx.cfg["models"]["graphsage"]
     edge_index, n_c, n = build_homogeneous(ctx, bool(gcfg.get("use_similarity_edges", False)))
     idx = ctx.kg.call_index
     tr_idx = np.array([idx[c] for c in ctx.train_ids])
@@ -305,9 +376,23 @@ def run_graphsage(ctx) -> None:
         e_train = e_val = edge_index
     graphs = {"train": _make_graph(e_train, n, use_pyg, device), "val": _make_graph(e_val, n, use_pyg, device),
               "full": _make_graph(edge_index, n, use_pyg, device)}
+    return graphs, edge_index, e_train, n_c, n
+
+
+def run_graphsage(ctx) -> None:
+    require("torch")
+    import torch
+
+    ctx.require_graph()
+    gcfg = ctx.cfg["models"]["graphsage"]
+    use_pyg = has_module("torch_geometric")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    graphs, edge_index, e_train, n_c, n = prepare_graphs(ctx, use_pyg, device)
+    idx = ctx.kg.call_index
 
     topo, topo_names = topology_block(ctx)
-    blocks_np = {"text": text_block(ctx, gcfg.get("node_features", "sbert")), "topo": topo, "type": type_block(ctx)}
+    text = text_block(ctx, gcfg.get("node_features", "sbert"))
+    blocks_np = {"text": text, "kg": kg_block(text, n_c), "topo": topo, "type": type_block(ctx)}
     log.info("GraphSAGE (%s, %s): %d nodes, %d directed edges (train graph %d) | blocks text %d-d, topology %d-d, "
              "type %d-d", "PyG SAGEConv" if use_pyg else "pure-PyTorch SAGE",
              "inductive" if gcfg.get("inductive", True) else "transductive", n, edge_index.shape[1],
@@ -324,6 +409,8 @@ def run_graphsage(ctx) -> None:
                     extra={"val_pr_auc": res["best_ap"], "epochs": res["epochs"], "blocks": variant})
         rows.append({"variant": variant, "model": name, "val_pr_auc": res["best_ap"], "epochs": res["epochs"],
                      "input_dims": res["dims"]})
+        # every variant's call embeddings are kept: script discovery compares them with bag-of-words clusters
+        np.savez_compressed(embeddings_path(ctx, variant), ids=np.array(ctx.kg.call_ids), emb=res["emb"])
         if k == 0:   # main variant: its embeddings feed graphsage_xgb (run_graphsage_xgb)
             np.savez_compressed(embeddings_path(ctx), ids=np.array(ctx.kg.call_ids), emb=res["emb"])
             torch.save(res["state"], ctx.paths.models / "graphsage.pt")
@@ -332,8 +419,89 @@ def run_graphsage(ctx) -> None:
                "variants": rows})
 
 
-def embeddings_path(ctx):
-    return ctx.paths.models / "graphsage_call_embeddings.npz"
+def seeds_path(ctx):
+    return ctx.paths.models / "graphsage_seeds.csv"
+
+
+def run_graphsage_seed_scores(ctx, seeds=(42, 1, 2, 3, 4), variants=("text+topo", "topo", "kg")) -> None:
+    """Every supervised variant over several seeds: GraphSAGE scores move between runs, so a claim about it should
+    not rest on one."""
+    require("torch")
+    import torch
+
+    ctx.require_graph()
+    gcfg = ctx.cfg["models"]["graphsage"]
+    use_pyg = has_module("torch_geometric")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    graphs, _, _, n_c, _ = prepare_graphs(ctx, use_pyg, device)
+    text = text_block(ctx, gcfg.get("node_features", "sbert"))
+    blocks = {"text": text, "kg": kg_block(text, n_c), "topo": topology_block(ctx)[0], "type": type_block(ctx)}
+    rows = {"call_id": list(ctx.kg.call_ids)}
+    for seed in seeds:
+        run = copy.copy(ctx)
+        run.seed = int(seed)
+        for v in variants:
+            rows[f"{v}|{seed}"] = _train_variant(run, v, blocks, graphs, n_c, use_pyg, device)["prob"]
+        log.info("GraphSAGE seed %s done", seed)
+    pd.DataFrame(rows).to_csv(seeds_path(ctx), index=False)
+
+
+def run_graphsage_scripts(ctx) -> None:
+    """The label-free embeddings that script discovery clusters."""
+    require("torch")
+    import torch
+
+    ctx.require_graph()
+    gcfg = ctx.cfg["models"]["graphsage"]
+    use_pyg = has_module("torch_geometric")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    graphs, _, e_train, n_c, _ = prepare_graphs(ctx, use_pyg, device)
+    text = text_block(ctx, gcfg.get("node_features", "sbert"))
+    blocks = {"text": text, "kg": kg_block(text, n_c), "topo": topology_block(ctx)[0], "type": type_block(ctx)}
+    z = _train_unsupervised(ctx, blocks, graphs, e_train, n_c, use_pyg, device)
+    np.savez_compressed(embeddings_path(ctx, "unsup"), ids=np.array(ctx.kg.call_ids), emb=z)
+
+
+def loto_path(ctx):
+    return ctx.paths.models / "graphsage_loto.npz"
+
+
+def run_graphsage_loto(ctx, variants=("text+topo", "topo", "kg")) -> None:
+    """Leave-one-type-out for GraphSAGE: every call of one dialogue type leaves the training and validation graphs
+    and only joins when scoring, so the type is a script the model never saw. Scores and embeddings of each fold are
+    saved; `scamkg.models.script_discovery` analyses them in a torch-free process (see run_deep_isolated)."""
+    require("torch")
+    import torch
+
+    ctx.require_graph()
+    gcfg = ctx.cfg["models"]["graphsage"]
+    use_pyg = has_module("torch_geometric")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    prim = ctx.calls[(ctx.calls["dataset"] == ctx.primary) & (ctx.calls["label"] >= 0)]
+    types = sorted(t for t in prim["subtype"].unique() if t)
+    text = text_block(ctx, gcfg.get("node_features", "sbert"))
+    typ = type_block(ctx)
+    saved = {"ids": np.array(ctx.kg.call_ids)}
+    for t in types:
+        fold = copy.copy(ctx)
+        fold.calls = ctx.calls.copy()
+        held = (fold.calls["dataset"] == ctx.primary) & (fold.calls["subtype"] == t)
+        fold.calls.loc[held & fold.calls["split"].isin(["train", "val"]), "split"] = "held_out"
+        graphs, _, e_train, n_c, _ = prepare_graphs(fold, use_pyg, device)
+        blocks = {"text": text, "kg": kg_block(text, n_c), "topo": topology_block(fold)[0], "type": typ}
+        for v in variants:
+            res = _train_variant(fold, v, blocks, graphs, n_c, use_pyg, device)
+            saved[f"{t}|{v}|prob"] = res["prob"]
+            saved[f"{t}|{v}|emb"] = res["emb"].astype(np.float32)
+        saved[f"{t}|unsup|emb"] = _train_unsupervised(fold, blocks, graphs, e_train, n_c, use_pyg,
+                                                      device).astype(np.float32)
+        log.info("GraphSAGE leave-one-type-out: %s done", t)
+    np.savez_compressed(loto_path(ctx), **saved)
+
+
+def embeddings_path(ctx, variant: str | None = None):
+    suffix = f"__{variant.replace('+', '_')}" if variant else ""
+    return ctx.paths.models / f"graphsage_call_embeddings{suffix}.npz"
 
 
 def run_graphsage_xgb(ctx) -> None:

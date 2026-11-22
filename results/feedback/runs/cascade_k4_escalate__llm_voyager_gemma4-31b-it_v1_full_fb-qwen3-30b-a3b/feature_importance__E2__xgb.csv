@@ -1,0 +1,41 @@
+feature,weight
+graph:sim_diff,0.43479487
+graph:knn_scam_rate,0.29500464
+graph:community_scam_rate,0.26777503
+tfidf:alright well,0.0011708667
+tfidf:hello,0.00076338375
+tfidf:card,0.0004911505
+tfidf:recognize that,0.0
+tfidf:recognize,0.0
+tfidf:recipients,0.0
+tfidf:recipient can,0.0
+tfidf:recipient,0.0
+tfidf:000,0.0
+tfidf:recently how,0.0
+tfidf:recently don,0.0
+tfidf:recently can,0.0
+tfidf:recently are,0.0
+tfidf:recently and,0.0
+tfidf:recently,0.0
+tfidf:recently what,0.0
+tfidf:recently we,0.0
+tfidf:recommend that,0.0
+tfidf:recent transaction,0.0
+tfidf:records okay,0.0
+tfidf:records of,0.0
+tfidf:records now,0.0
+tfidf:records it,0.0
+tfidf:records how,0.0
+tfidf:records can,0.0
+tfidf:records but,0.0
+tfidf:recommend,0.0
+tfidf:records and,0.0
+tfidf:recording,0.0
+tfidf:recorded,0.0
+tfidf:record of,0.0
+tfidf:record for,0.0
+tfidf:record,0.0
+tfidf:reconsider,0.0
+tfidf:recommend we,0.0
+tfidf:records,0.0
+tfidf:recent sweepstakes,0.0

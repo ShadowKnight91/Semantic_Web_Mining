@@ -1,0 +1,41 @@
+feature,weight
+graph:sim_diff,0.50982076
+graph:knn_scam_rate,0.33029184
+graph:sim_scam_topk,0.15145403
+graph:sim_scam_max,0.005470504
+graph:entity_risk_max,0.0026343267
+tfidf:alright,0.0003285557
+tfidf:refund and,0.0
+tfidf:refund amount,0.0
+tfidf:refund alright,0.0
+tfidf:000,0.0
+tfidf:refund already,0.0
+tfidf:refund all,0.0
+tfidf:refund ah,0.0
+tfidf:refund again,0.0
+tfidf:refund account,0.0
+tfidf:refund,0.0
+tfidf:refreshing to,0.0
+tfidf:refreshing,0.0
+tfidf:refund apologize,0.0
+tfidf:refund are,0.0
+tfidf:refund as,0.0
+tfidf:refund but,0.0
+tfidf:refund into,0.0
+tfidf:refund instead,0.0
+tfidf:refund immediately,0.0
+tfidf:refund if,0.0
+tfidf:refund however,0.0
+tfidf:refund how,0.0
+tfidf:refund hmm,0.0
+tfidf:refund got,0.0
+tfidf:references right,0.0
+tfidf:refund going,0.0
+tfidf:refund for,0.0
+tfidf:refund don,0.0
+tfidf:refund do,0.0
+tfidf:refund directly,0.0
+tfidf:refund didn,0.0
+tfidf:refund department,0.0
+tfidf:refund com,0.0
+tfidf:refund can,0.0
